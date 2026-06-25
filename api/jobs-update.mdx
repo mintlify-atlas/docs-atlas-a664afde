@@ -1,16 +1,16 @@
 ---
 title: "PUT and PATCH /jobs/:id — update a job listing"
 sidebarTitle: "Update Job"
-description: "PUT /jobs/:id replaces a job completely. PATCH /jobs/:id applies a partial update. Both require the job to exist and validate input with Zod."
+description: "PUT /jobs/:id fully replaces a job (no Zod validation). PATCH /jobs/:id applies a partial Zod-validated update. Both return 404 if the job does not exist."
 ---
 
-The API exposes two update verbs for job listings. `PUT /jobs/:id` performs a **full replacement** — the entire job record is overwritten with the supplied payload (while preserving the original `id`). `PATCH /jobs/:id` performs a **partial update** — only the fields present in the request body are merged into the existing record; all other fields are left unchanged. Both methods return a `404` when the target job does not exist.
+The API exposes two update verbs for job listings. `PUT /jobs/:id` performs a **full replacement** — the entire job record is overwritten with the supplied payload (while preserving the original `id`); note that `PUT` does **not** pass through the Zod validation middleware. `PATCH /jobs/:id` performs a **partial update** — only the fields present in the request body are merged into the existing record; all other fields are left unchanged, and the body is validated with Zod's `.partial()` schema. Both methods return a `404` when the target job does not exist.
 
 ---
 
 ## PUT /jobs/:id — Full Update
 
-Use `PUT` when you want to replace all fields of an existing job in a single operation. The request body follows the same schema as `POST /jobs` and must include all required fields.
+Use `PUT` when you want to replace all fields of an existing job in a single operation. The request body follows the same schema as `POST /jobs` and must include all required fields. Unlike `POST` and `PATCH`, the `PUT` route does **not** run through the Zod validation middleware — the payload is passed directly to the model.
 
 ```
 PUT /jobs/:id
@@ -80,7 +80,7 @@ curl -X PUT http://localhost:1234/jobs/c3f2a1b4-9d87-4e56-b123-0f7a6c2d8e91 \
 
 ## PATCH /jobs/:id — Partial Update
 
-Use `PATCH` when you only need to change one or more fields without supplying the full object. All body fields are optional — the Zod schema is applied with `.partial()`, making every field optional for this method. Submitted fields are shallow-merged into the existing record.
+Use `PATCH` when you only need to change one or more fields without supplying the full object. All body fields are optional — the Zod schema is applied with `.partial()` via the `validateUpdate` middleware, making every field optional for this method. Submitted fields are shallow-merged into the existing record.
 
 ```
 PATCH /jobs/:id
@@ -136,10 +136,18 @@ curl -X PATCH http://localhost:1234/jobs/c3f2a1b4-9d87-4e56-b123-0f7a6c2d8e91 \
 
 ---
 
-### 404 Response
+### 404 Response — PUT
 
-Returned by both `PUT` and `PATCH` when no job with the given ID exists in the store.
+Returned when no job with the given ID exists in the store.
 
 ```json
 { "error": "Job Not Found" }
+```
+
+### 404 Response — PATCH
+
+Returned when no job with the given ID exists in the store. Note the trailing space in the error string — this matches the exact string returned by the controller.
+
+```json
+{ "error": "Job Not Found " }
 ```

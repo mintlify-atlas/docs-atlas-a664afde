@@ -77,6 +77,20 @@ GET /jobs?limit=20&offset=40
     Create a new job listing with Zod-validated input.
   </Card>
   <Card
+    title="PUT and PATCH /jobs/:id"
+    icon="pen"
+    href="/api/jobs-update"
+  >
+    Fully replace or partially update an existing job listing.
+  </Card>
+  <Card
+    title="DELETE /jobs/:id"
+    icon="trash"
+    href="/api/jobs-delete"
+  >
+    Remove a job listing by UUID and receive the deleted record.
+  </Card>
+  <Card
     title="GET /ai/summary/:id"
     icon="sparkles"
     href="/api/ai-summary"

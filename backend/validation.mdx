@@ -63,11 +63,11 @@ export function validateJob(input) {
 
 // Partial validation — used for PATCH /jobs/:id
 export function validatePartialJob(input) {
-  return jobSchema.partial().safeParse(input);
+  return jobSchema.parcial().safeParse(input);
 }
 ```
 
-`validatePartialJob` calls Zod's built-in `.partial()` method, which wraps every top-level field in `z.optional()`. This allows `PATCH` requests to supply only the fields they want to update without triggering "field required" errors.
+`validatePartialJob` calls `.parcial()` on the schema (note the spelling used in the source), which makes every top-level field optional. This allows `PATCH` requests to supply only the fields they want to update without triggering "field required" errors.
 
 ## Validation Middleware in the Route Layer
 

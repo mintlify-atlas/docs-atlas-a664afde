@@ -1,10 +1,10 @@
 ---
-title: "InfoJobs DevBoard repository layout and implementation stages"
+title: "InfoJobs DevBoard monorepo layout and implementation stages"
 sidebarTitle: "Project Structure"
-description: "Understand how the InfoJobs DevBoard monorepo is organized across eight implementation stages, from vanilla HTML to a full-stack TypeScript app with AI."
+description: "Understand how the InfoJobs DevBoard monorepo is organized across ten implementation stages, from vanilla HTML to a full-stack TypeScript app with AI."
 ---
 
-The InfoJobs DevBoard repository is organized as a monorepo where each top-level numbered directory represents a self-contained implementation stage. Each stage builds on concepts introduced in the previous one, taking the project from a static HTML/CSS prototype through vanilla JavaScript, React, routing, state management, a REST API, TypeScript, AI integration, and finally a SQL-backed backend. You do not need to work through every stage — most readers will want to go straight to `07-inteligencia-artificial`, which is the complete full-stack application.
+The InfoJobs DevBoard repository is organized as a monorepo where each top-level numbered directory represents a self-contained implementation stage. Each stage builds on concepts introduced in the previous one, taking the project from a static HTML/CSS prototype through vanilla JavaScript, React, routing, state management, a REST API, TypeScript, AI integration, a SQL-backed backend, and finally a CI/CD pipeline. You do not need to work through every stage — most readers will want to go straight to `07-inteligencia-artificial`, which is the complete full-stack application.
 
 ## Top-level layout
 
@@ -27,18 +27,19 @@ infoJobs/
 
 ## Implementation stages
 
-| Stage | Directory | Description |
-|---|---|---|
-| 0 | `00-html-css` | Pure HTML/CSS prototype — static markup and styling with no JavaScript |
-| 1 | `01-javascript` | Vanilla JS that fetches job data from a local JSON file and renders listings dynamically |
-| 2 | `02-react` | React 19 application built with a custom hand-rolled router (no React Router) |
-| 3 | `03-router-and-zustand` | Adds React Router DOM 7 for client-side navigation and Zustand 5 for global state |
-| 4 | `04-express` | Express 5 REST API in JavaScript with CRUD endpoints, Zod validation, and CORS |
-| 5 | `04-node` | Node.js fundamentals: CLI scripts, the `fs` module, and a raw HTTP server |
-| 6 | `05-testing` | Playwright end-to-end test suite covering the job board UI |
-| 7 | `06-typescript` | TypeScript language fundamentals applied to the project codebase |
-| 8 | `07-inteligencia-artificial` | **Main app** — React 19 frontend + Express 5 backend + Ollama AI summaries |
-| 9 | `08-sql` | TypeScript backend using Express and `better-sqlite3` for persistent SQLite storage |
+| Directory | Description |
+|---|---|
+| `00-html-css` | Pure HTML/CSS prototype — static markup and styling with no JavaScript |
+| `01-javascript` | Vanilla JS that fetches job data from a local JSON file and renders listings dynamically |
+| `02-react` | React 19 application built with a custom hand-rolled router (no React Router) |
+| `03-router-and-zustand` | Adds React Router DOM 7 for client-side navigation and Zustand 5 for global state |
+| `04-express` | Express 5 REST API in JavaScript with CRUD endpoints, Zod validation, and CORS |
+| `04-node` | Node.js fundamentals: CLI scripts, the `fs` module, and a raw HTTP server |
+| `05-testing` | Playwright end-to-end test suite covering the job board UI |
+| `06-typescript` | TypeScript language fundamentals applied to the project codebase |
+| `07-inteligencia-artificial` | **Main app** — React 19 frontend + Express 5 backend + Ollama AI summaries |
+| `08-sql` | TypeScript backend using Express and `better-sqlite3` for persistent SQLite storage |
+| `09-ci-cd` | CI/CD pipeline experiments and deployment configuration |
 
 ## Inside `07-inteligencia-artificial`
 
@@ -73,9 +74,11 @@ This is the primary full-stack stage and the one documented in detail throughout
 │       │   ├── Details.jsx       # Job detail page with AI summary
 │       │   ├── Login.jsx         # Login page
 │       │   ├── Register.jsx      # Registration page
-│       │   └── ProfilePage.jsx   # Protected user profile page
+│       │   ├── ProfilePage.jsx   # Protected user profile page
+│       │   └── 404.jsx           # Not-found page
 │       ├── components/
 │       │   ├── Header.jsx        # Top navigation bar
+│       │   ├── HeaderUserButton.jsx   # User auth button in header
 │       │   ├── Footer.jsx        # Page footer
 │       │   ├── JobCard.jsx       # Individual job listing card
 │       │   ├── JobListings.jsx   # Job list container
@@ -83,8 +86,13 @@ This is the primary full-stack stage and the one documented in detail throughout
 │       │   ├── Pagination.jsx    # Page navigation controls
 │       │   ├── SearchFormSection.jsx  # Filter form (text, tech, level)
 │       │   ├── ProtectedRoute.jsx     # Auth guard for private pages
-│       │   ├── Spinner.jsx       # Loading indicator
-│       │   └── ...               # Additional layout components
+│       │   ├── DetailPageHeader.jsx   # Job detail page header
+│       │   ├── DetailPageBreadCrumb.jsx  # Breadcrumb for detail page
+│       │   ├── Link.jsx          # Custom link component
+│       │   ├── Route.jsx         # Custom route component
+│       │   └── Spinner.jsx       # Loading indicator
+│       ├── context/
+│       │   └── AuthContext.jsx   # React context for auth state
 │       ├── hooks/
 │       │   ├── useAISummary.jsx  # Fetches and streams AI job summaries
 │       │   ├── useFilters.jsx    # Manages URL-based filter state

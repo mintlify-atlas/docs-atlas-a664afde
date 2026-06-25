@@ -1,7 +1,7 @@
 ---
 title: "Express 5 backend architecture: routes, controllers, models"
 sidebarTitle: "Backend"
-description: "The InfoJobs DevBoard backend is an Express 5 REST API organized into routes, controllers, models, schemas, and middlewares — validated with Zod and rate-limited with express-rate-limit."
+description: "InfoJobs DevBoard's Express 5 REST API has routes, controllers, models, and Zod schemas with CORS middleware and a rate limiter on the AI summary endpoint."
 ---
 
 The InfoJobs DevBoard backend is an Express 5 REST API written with ES Modules. It follows a layered architecture where each concern lives in its own directory: routes declare URL patterns, controllers hold business logic, models handle data access, and Zod schemas validate every incoming payload. Two middleware layers — CORS and a per-route rate limiter — sit in front of the AI endpoint to control access and prevent abuse.
@@ -72,7 +72,7 @@ export const CONFIG = {
 }
 ```
 
-`DEFAULTS.PORT` is used by `index.js` as the fallback when `process.env.PORT` is not set. `CONFIG.MODEL_AI` can be overridden at runtime via the `MODEL_AI` environment variable — for example, to switch to a different locally available Ollama model without touching source code.
+`DEFAULTS.PORT` is used by `index.js` as the fallback when `process.env.PORT` is not set. `CONFIG.MODEL_AI` is exported for future use but is currently not wired into the AI route — the `/ai/summary/:id` handler hard-codes `model: 'qwen2.5:3b'` directly in the `ollama.chat()` call.
 
 ## Router modules
 
@@ -100,7 +100,7 @@ The single endpoint `GET /ai/summary/:id` works as follows:
     `JobModel.getById(id)` reads the matching record from `jobs.json`. Returns `404` if not found.
   </Step>
   <Step title="Build the prompt">
-    A multi-line Spanish-language prompt is assembled from the job's `titulo`, `empresa`, `ubicacion`, and `descripcion` fields. A system prompt restricts the model to summary-only responses.
+    A multi-line Spanish-language prompt is assembled from the job's `titulo`, `empresa`, `ubicacion`, and `descripcion` fields, instructing the model to produce a 4–6 sentence Spanish-language summary.
   </Step>
   <Step title="Stream from Ollama">
     `ollama.chat()` is called with `model: 'qwen2.5:3b'` and `stream: true`. Response headers are set to `Content-Type: text/plain; charset=utf-8` and `Transfer-Encoding: chunked`.

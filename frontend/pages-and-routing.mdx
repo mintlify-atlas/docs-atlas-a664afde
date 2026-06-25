@@ -1,7 +1,7 @@
 ---
 title: "Pages and client-side routing in InfoJobs DevBoard"
 sidebarTitle: "Pages & Routing"
-description: "InfoJobs DevBoard uses React Router DOM 7 with lazy-loaded pages, protected routes, and URL-based search filters. Covers all seven routes and the ProtectedRoute guard."
+description: "How InfoJobs DevBoard uses React Router DOM 7: lazy-loaded pages, a ProtectedRoute guard, URL-synced filters, and all seven application routes explained."
 ---
 
 InfoJobs DevBoard uses **React Router DOM 7** for client-side routing. Every page component is loaded with React's `lazy()` function and wrapped in a single `<Suspense>` boundary, so the browser only downloads the code for a page when the user first navigates to it. The `Header` and `Footer` components sit outside the `<Routes>` tree so they persist across all navigations without re-mounting.
@@ -42,7 +42,7 @@ function App() {
   return (
     <>
       <Header />
-      <Suspense fallback={<div>Cargando...</div>}>
+      <Suspense fallback={<div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 1rem' }}>Cargando...</div>}>
         <Routes>
           <Route path="/"         element={<HomePage />} />
           <Route path="/search"   element={<SearchPage />} />

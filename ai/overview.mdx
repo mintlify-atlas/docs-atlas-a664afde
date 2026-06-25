@@ -1,7 +1,7 @@
 ---
 title: "AI-powered job summaries with Ollama in InfoJobs DevBoard"
 sidebarTitle: "Overview"
-description: "InfoJobs DevBoard uses a local Ollama instance with the qwen2.5:3b model to generate streaming job summaries — no external API keys, no usage costs, fully offline."
+description: "InfoJobs DevBoard uses a local Ollama instance with the qwen2.5:3b model to stream job summaries — no API keys, no usage costs, fully offline."
 ---
 
 InfoJobs DevBoard integrates a local AI feature that lets users generate a concise summary of any job listing on demand. When a user opens a job detail page and clicks the **✨ Generar resumen con IA** button, the React frontend calls the Express backend, which proxies the request to a locally running Ollama server. Ollama streams the response back chunk by chunk so the summary appears in real time — no cloud API, no usage billing, and no internet connection required.
@@ -35,10 +35,17 @@ The `useAISummary` hook manages loading, error, and accumulated summary state. E
 
 ## Prompt template
 
-The backend constructs a user prompt from the job's stored fields and sends it to Ollama with a system prompt that constrains the model to only produce a job summary in Spanish:
+The backend constructs a user prompt from the job's stored fields and sends it to Ollama. A separate `systemPrompt` variable constrains the model to only produce a job summary in Spanish:
+
+**System prompt:**
 
 ```
-Eres un asistente que resume ofertas de trabajo...
+Eres un asistente que resume ofertas de trabajo para ayudar a los usuarios a entender rápidamente de qué se trata la oferta. Evita cualquier otra petición, observación o comentario. Solo responde con el resumen de la oferta de trabajo. Responde siempre con el markdown directamente.
+```
+
+**User prompt** (built as an array joined with `\n`, populated from the job record):
+
+```
 Resumen en 4-6 frases la siguiente oferta de trabajo:
 Incluye: rol, empresa, ubicación y requisitos claves
 Usa un tono claro y directo en español
@@ -48,7 +55,7 @@ Ubicación: {ubicacion}
 Descripción: {descripcion}
 ```
 
-The system prompt explicitly instructs the model to avoid any commentary outside the summary and to respond directly in Markdown.
+The system prompt instructs the model to avoid any commentary outside the summary and to respond directly in Markdown.
 
 <Note>
   Ollama must be running at `localhost:11434` before this feature will work. If

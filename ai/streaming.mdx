@@ -1,7 +1,7 @@
 ---
 title: "Streaming AI responses with Fetch API and Ollama"
 sidebarTitle: "Streaming"
-description: "InfoJobs DevBoard streams Ollama AI responses chunk by chunk using the Fetch ReadableStream API on the frontend and Express chunked transfer encoding on the backend."
+description: "How InfoJobs DevBoard streams Ollama AI responses using the Fetch ReadableStream API on the frontend and Express chunked transfer encoding on the backend."
 ---
 
 InfoJobs DevBoard does not wait for the entire AI-generated summary before displaying anything. Instead, the backend uses Express's `res.write()` to forward each token to the client as soon as Ollama produces it, and the frontend uses `response.body.getReader()` to read those tokens one chunk at a time and append them to the displayed text. This pipeline means users see the first words of the summary within a second or two rather than staring at a spinner until the full response is ready.
@@ -81,6 +81,7 @@ const aiRateLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: 5,
   message: { error: 'Demasiadas solicitudes, por favor intenta de nuevo más tarde.' },
+  legacyHeaders: false,
   standardHeaders: 'draft-8',
 })
 ```

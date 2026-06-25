@@ -1,7 +1,7 @@
 ---
-title: "Custom React hooks in InfoJobs DevBoard"
+title: "Custom React hooks reference for InfoJobs DevBoard frontend"
 sidebarTitle: "Custom Hooks"
-description: "InfoJobs DevBoard defines four custom hooks — useFilters, useSearchForm, useRouter, and useAISummary — that encapsulate search, navigation, and AI summary logic."
+description: "Reference for InfoJobs DevBoard's four custom hooks: useFilters, useSearchForm, useRouter, and useAISummary — search, navigation, and AI streaming."
 ---
 
 InfoJobs DevBoard separates all non-trivial logic from its page and component files into custom hooks located in `frontend/src/hooks/`. This pattern keeps components declarative and easy to read, makes the logic independently testable, and allows the same behaviour to be reused across multiple components without prop drilling. Each hook follows React's naming convention of prefixing with `use`.

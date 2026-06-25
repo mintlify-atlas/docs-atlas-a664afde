@@ -21,7 +21,7 @@ GET /jobs
 </ParamField>
 
 <ParamField query="level" type="string">
-  Filter by experience level. Typical values are `junior`, `mid`, and `senior`, matching the `data.nivel` field.
+  Accepted by the query parser and forwarded to the model, but the current `JobModel.getAll` implementation does not apply a filter on this parameter — all jobs are returned regardless of the value supplied. This filter is reserved for a future implementation that will match against the `data.nivel` field.
 </ParamField>
 
 <ParamField query="technology" type="string">

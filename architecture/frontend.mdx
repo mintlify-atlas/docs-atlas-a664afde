@@ -1,7 +1,7 @@
 ---
 title: "React 19 frontend architecture and component structure"
 sidebarTitle: "Frontend"
-description: "The InfoJobs DevBoard frontend is built with React 19, Vite 7, React Router DOM 7, and Zustand 5 — using lazy-loaded pages, protected routes, and CSS Modules."
+description: "InfoJobs DevBoard's frontend uses React 19, Vite 7, React Router DOM 7, and Zustand 5 with lazy-loaded pages, a protected route, and CSS Modules."
 ---
 
 The InfoJobs DevBoard frontend is a single-page application that combines React 19's concurrent rendering model with Vite 7's native ES-module dev server. Page components are lazy-loaded on demand, global state is handled by two lightweight Zustand stores, and all styling is scoped to individual components through CSS Modules. The app connects to the Express backend using the `VITE_API_URL` environment variable and streams AI-generated job summaries directly into the job detail view.
@@ -103,7 +103,7 @@ function App() {
             <ProtectedRoute redirecTo='/login'>
               <ProfilePage />
             </ProtectedRoute>
-            } />+
+            } />
           <Route path='/login' element={<Login />} />
           <Route path='/register' element={<Register />} />
           <Route path="*" element={<NotFoundPage />} /> {/* siempre debe ir al final */}

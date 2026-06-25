@@ -46,7 +46,7 @@ This guide walks you through cloning the InfoJobs DevBoard repository, starting 
     The API server starts on **port 1234** using `nodemon` for automatic restarts on file changes. You should see output similar to:
 
     ```
-    Server running on http://localhost:1234
+    Servidor levantado en http://localhost:1234
     ```
   </Step>
 
@@ -69,7 +69,7 @@ This guide walks you through cloning the InfoJobs DevBoard repository, starting 
     curl http://localhost:1234/jobs
     ```
 
-    A successful response returns a paginated JSON object:
+    A successful response returns a paginated JSON object. Job fields use Spanish names as stored in `jobs.json`:
 
     ```json
     {
@@ -78,13 +78,22 @@ This guide walks you through cloning the InfoJobs DevBoard repository, starting 
       "offset": 0,
       "data": [
         {
-          "id": "1",
-          "title": "Senior Frontend Developer",
-          "company": "Acme Corp",
-          "location": "Remote",
-          "level": "senior",
-          "technologies": ["React", "TypeScript"],
-          "description": "..."
+          "id": "7a4d1d8b-1e45-4d8c-9f1a-8c2f9a9121a4",
+          "titulo": "Desarrollador de Software Senior",
+          "empresa": "Tech Solutions Inc.",
+          "ubicacion": "Remoto",
+          "descripcion": "Buscamos un ingeniero de software...",
+          "data": {
+            "technology": ["react", "node", "javascript"],
+            "modalidad": "remoto",
+            "nivel": "senior"
+          },
+          "content": {
+            "description": "...",
+            "responsibilities": "...",
+            "requirements": "...",
+            "about": "..."
+          }
         }
       ]
     }
@@ -93,8 +102,11 @@ This guide walks you through cloning the InfoJobs DevBoard repository, starting 
     You can also filter results using query parameters:
 
     ```bash
-    # Filter by technology and level
-    curl "http://localhost:1234/jobs?technologies=React&level=senior"
+    # Filter by technology (singular param name)
+    curl "http://localhost:1234/jobs?technology=react"
+
+    # Filter by free-text search across titulo and descripcion
+    curl "http://localhost:1234/jobs?text=senior"
 
     # Paginate with limit and offset
     curl "http://localhost:1234/jobs?limit=5&offset=10"
@@ -141,6 +153,20 @@ VITE_API_URL=http://localhost:1234
 </CodeGroup>
 
 After creating or editing the `.env` file, restart the Vite dev server for the change to take effect.
+
+## Configure the backend AI model
+
+The backend reads the Ollama model name from the `MODEL_AI` environment variable, defined in `backend/config.js`. Create a `.env` file inside the `backend/` directory to override the default:
+
+```bash
+# backend/.env
+PORT=1234
+MODEL_AI=qwen2.5:3b
+```
+
+<Note>
+  The default value for `MODEL_AI` is `mistral/devstral-small-2`. The AI route (`backend/routes/ai.js`) currently hard-codes `qwen2.5:3b` — set this variable if you want to use a different locally available Ollama model. Any model listed by `ollama list` can be used here.
+</Note>
 
 ## Next steps
 

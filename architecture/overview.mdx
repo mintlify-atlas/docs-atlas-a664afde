@@ -1,7 +1,7 @@
 ---
 title: "InfoJobs DevBoard architecture: client-server with AI"
 sidebarTitle: "Overview"
-description: "InfoJobs DevBoard uses a React frontend communicating with an Express REST API, backed by a local JSON store and an Ollama AI service for streaming job summaries."
+description: "InfoJobs DevBoard: React 19 SPA, Express REST API, flat JSON store, and a local Ollama service that streams AI-generated job summaries to the browser."
 ---
 
 InfoJobs DevBoard follows a classic client-server architecture: a React 19 single-page application running in the browser communicates exclusively with an Express 5 REST API over HTTP. The backend is the single source of truth for job data — it reads from a flat JSON file — and it also acts as a proxy between the frontend and a locally running Ollama AI service, forwarding streaming text responses back to the browser without buffering.

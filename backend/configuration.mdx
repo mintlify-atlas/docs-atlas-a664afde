@@ -4,7 +4,7 @@ sidebarTitle: "Configuration"
 description: "Configure the InfoJobs DevBoard Express backend with environment variables for port, AI model, and CORS. Covers available npm scripts and middleware setup."
 ---
 
-The InfoJobs DevBoard backend is an Express 5 server that reads its runtime settings from environment variables, falling back to sensible defaults defined in `config.js`. This keeps the codebase portable across development and production environments without requiring code changes.
+The InfoJobs DevBoard backend is an Express server that reads its runtime settings from environment variables, falling back to sensible defaults defined in `config.js`. This keeps the codebase portable across development and production environments without requiring code changes.
 
 ## Environment Variables
 
@@ -13,7 +13,7 @@ The following variables control the server's runtime behaviour. Values in the **
 | Variable | Default | Description |
 |---|---|---|
 | `PORT` | `1234` | HTTP port the Express server listens on |
-| `MODEL_AI` | `mistral/devstral-small-2` | AI model identifier — read from `CONFIG` but the active AI route uses Ollama directly with `qwen2.5:3b` |
+| `MODEL_AI` | `mistral/devstral-small-2` | AI model identifier exported from `CONFIG` in `config.js` |
 | `VITE_API_URL` | — | Set in the **frontend** `.env`; should point to the running backend URL (e.g. `http://localhost:1234`) |
 
 The defaults are centralised in `backend/config.js`:

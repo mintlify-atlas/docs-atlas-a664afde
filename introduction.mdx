@@ -1,18 +1,18 @@
 ---
 title: "InfoJobs DevBoard: AI-powered developer job board"
 sidebarTitle: "Introduction"
-description: "InfoJobs DevBoard is a full-stack job board for developers with AI-powered summaries, a RESTful Express API, and a React 19 frontend built through eight progressive stages."
+description: "Full-stack developer job board with Ollama AI summaries, Express 5 REST API, and React 19 frontend — built across ten progressive implementation stages."
 ---
 
-InfoJobs DevBoard is a full-stack job board application built for developers, where users can browse and filter developer job listings, view full job details, and generate on-demand AI summaries of each posting — all powered by a local Ollama model running entirely offline. The project was developed as part of the midudev bootcamp and progresses through eight implementation stages, from a static HTML/CSS prototype up to a React 19 frontend paired with an Express 5 REST API and integrated AI.
+InfoJobs DevBoard is a full-stack job board application built for developers, where users can browse and filter developer job listings, view full job details, and generate on-demand AI summaries of each posting — all powered by a local Ollama model running entirely offline. The project was developed as part of the midudev bootcamp and progresses through ten implementation stages, from a static HTML/CSS prototype up to a React 19 frontend paired with an Express 5 REST API and integrated AI.
 
 ## Key features
 
-- **Job search with filters** — search listings by title, description, technology stack, and experience level (junior, senior, etc.), with paginated results.
+- **Job search with filters** — search listings by free-text (title and description) and technology stack, with configurable paginated results (`limit` and `offset` query params).
 - **AI-powered summaries** — generate concise, streaming summaries of job postings using Ollama (`qwen2.5:3b`) running locally. No external API keys or costs required.
 - **Full CRUD REST API** — Express 5 backend exposes endpoints to list, create, update (PUT/PATCH), and delete job listings, with Zod schema validation on all inputs.
 - **React frontend with auth and routing** — React 19 app with React Router DOM 7, protected routes, user registration and login pages, and a profile page.
-- **Global state management** — Zustand 5 stores handle authentication state (`authStore`) and saved favorites (`favoriteStore`).
+- **Global state management** — Zustand 5 stores handle authentication state (`authStore`) and saved job favorites (`favoriteStore`, with `toggleFavorite`, `addFavorite`, and `removeFavorite` actions).
 - **Rate limiting** — AI endpoints are protected with `express-rate-limit` (5 requests per minute per IP) to prevent abuse.
 
 ## Explore the docs
@@ -57,20 +57,21 @@ InfoJobs DevBoard is a full-stack job board application built for developers, wh
 
 ## Implementation stages
 
-The repository is structured as a monorepo with eight numbered directories, each representing a progressive stage of the project:
+The repository is structured as a monorepo with ten numbered directories, each representing a progressive stage of the project:
 
-| Stage | Directory | Focus |
-|---|---|---|
-| 0 | `00-html-css` | Static HTML/CSS prototype |
-| 1 | `01-javascript` | Vanilla JS with local JSON data |
-| 2 | `02-react` | React 19 app with a custom router |
-| 3 | `03-router-and-zustand` | React Router DOM 7 + Zustand state management |
-| 4 | `04-express` | Express 5 REST API in JavaScript |
-| 5 | `04-node` | Node.js fundamentals (CLI, `fs`, HTTP server) |
-| 6 | `05-testing` | Playwright end-to-end testing |
-| 7 | `06-typescript` | TypeScript fundamentals |
-| 8 | `07-inteligencia-artificial` | **Main app** — React + Express + Ollama AI |
-| 9 | `08-sql` | TypeScript backend with SQLite via `better-sqlite3` |
+| Directory | Focus |
+|---|---|
+| `00-html-css` | Static HTML/CSS prototype |
+| `01-javascript` | Vanilla JS with local JSON data |
+| `02-react` | React 19 app with a custom router |
+| `03-router-and-zustand` | React Router DOM 7 + Zustand state management |
+| `04-express` | Express 5 REST API in JavaScript |
+| `04-node` | Node.js fundamentals (CLI, `fs`, HTTP server) |
+| `05-testing` | Playwright end-to-end testing |
+| `06-typescript` | TypeScript fundamentals |
+| `07-inteligencia-artificial` | **Main app** — React + Express + Ollama AI |
+| `08-sql` | TypeScript backend with SQLite via `better-sqlite3` |
+| `09-ci-cd` | CI/CD pipeline experiments |
 
 The `07-inteligencia-artificial` stage is the primary full-stack version and the one covered by the rest of this documentation.
 

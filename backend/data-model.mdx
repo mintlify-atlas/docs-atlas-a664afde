@@ -8,35 +8,35 @@ InfoJobs DevBoard currently persists all job listings in a flat JSON file (`back
 
 ## Job Schema
 
-The canonical shape of a job record is defined by the TypeScript interfaces below. These types ship with the SQL-backed variant of the project and serve as the authoritative reference for the field names and allowed values used across the whole application.
+Every job record in `backend/jobs.json` uses Spanish field names, matching the Zod schema and the `JobModel` class. The shape of a record is:
 
 ```typescript
 interface Job {
-  id: string           // UUID generated automatically on creation
-  title: string        // Job title
-  company: string      // Company name
-  location: string     // Job location
-  description: string  // Short description shown in listing cards
+  id: string              // UUID generated automatically on creation
+  titulo: string          // Job title (3–100 characters)
+  empresa: string         // Company name
+  ubicacion: string       // Job location
+  descripcion?: string    // Short description shown in listing cards (optional)
   data: JobData
-  content?: JobContent
+  content: JobContent
 }
 
 interface JobData {
-  technology: string[]
-  modality: 'remote' | 'onsite' | 'hybrid'
-  level: 'junior' | 'mid' | 'senior'
+  technology: string[]    // e.g. ["react", "node", "javascript"]
+  modalidad: string       // e.g. "remoto", "presencial", "hibrido"
+  nivel: string           // e.g. "junior", "senior", "lead"
 }
 
 interface JobContent {
-  description: string
-  responsibilities: string
-  requirements: string
-  about: string
+  description: string       // Long-form job description
+  responsibilities: string  // Responsibilities of the role
+  requirements: string      // Requirements for the role
+  about: string             // About the company
 }
 ```
 
 <Note>
-  The JSON data file and the Zod schema use Spanish field names (`titulo`, `empresa`, `ubicacion`, `descripcion`, `modalidad`, `nivel`). The TypeScript interfaces above use English names — the SQL version of the project maps these fields when migrating data.
+  The SQL-backed variant of the project (`08-sql`) uses English field names (`title`, `company`, `location`, etc.). The `07-inteligencia-artificial` API documented here always uses the Spanish names shown above.
 </Note>
 
 ### Concrete record example
