@@ -1,0 +1,191 @@
+---
+title: "Job data model and in-memory store in InfoJobs DevBoard"
+sidebarTitle: "Data Model"
+description: "InfoJobs DevBoard stores jobs in a flat JSON file. Learn the Job schema, field constraints, and how the JobModel class provides CRUD operations over the data."
+---
+
+InfoJobs DevBoard currently persists all job listings in a flat JSON file (`backend/jobs.json`). The `JobModel` class imports this file at startup and performs every read and write operation directly against the in-memory array. This keeps the setup dependency-free, but means data is not persisted between server restarts.
+
+## Job Schema
+
+The canonical shape of a job record is defined by the TypeScript interfaces below. These types ship with the SQL-backed variant of the project and serve as the authoritative reference for the field names and allowed values used across the whole application.
+
+```typescript
+interface Job {
+  id: string           // UUID generated automatically on creation
+  title: string        // Job title
+  company: string      // Company name
+  location: string     // Job location
+  description: string  // Short description shown in listing cards
+  data: JobData
+  content?: JobContent
+}
+
+interface JobData {
+  technology: string[]
+  modality: 'remote' | 'onsite' | 'hybrid'
+  level: 'junior' | 'mid' | 'senior'
+}
+
+interface JobContent {
+  description: string
+  responsibilities: string
+  requirements: string
+  about: string
+}
+```
+
+<Note>
+  The JSON data file and the Zod schema use Spanish field names (`titulo`, `empresa`, `ubicacion`, `descripcion`, `modalidad`, `nivel`). The TypeScript interfaces above use English names — the SQL version of the project maps these fields when migrating data.
+</Note>
+
+### Concrete record example
+
+The following is a real record from `backend/jobs.json`:
+
+```json
+{
+  "id": "7a4d1d8b-1e45-4d8c-9f1a-8c2f9a9121a4",
+  "titulo": "Desarrollador de Software Senior",
+  "empresa": "Tech Solutions Inc.",
+  "ubicacion": "Remoto",
+  "descripcion": "Buscamos un ingeniero de software con experiencia en desarrollo web y conocimientos en JavaScript, React y Node.js.",
+  "data": {
+    "technology": ["react", "node", "javascript"],
+    "modalidad": "remoto",
+    "nivel": "senior"
+  },
+  "content": {
+    "description": "Tech Solutions Inc. está buscando un Ingeniero de Software Senior altamente motivado...",
+    "responsibilities": "- Diseñar, desarrollar y mantener aplicaciones web utilizando tecnologías modernas.\n- Colaborar con equipos de producto y diseño...",
+    "requirements": "- Licenciatura en Informática o campo relacionado.\n- Mínimo de 5 años de experiencia en desarrollo de software...",
+    "about": "Tech Solutions Inc. es una empresa de tecnología innovadora que se centra en la creación de soluciones de software de vanguardia."
+  }
+}
+```
+
+## JobModel Class
+
+`backend/models/job.js` exports a single class, `JobModel`, whose static async methods form the complete data-access layer. All methods operate on the in-memory array populated when the module is first imported.
+
+<CardGroup cols={2}>
+  <Card title="getAll" icon="list">
+    Returns a paginated, filtered slice of all jobs together with metadata.
+  </Card>
+  <Card title="getById" icon="magnifying-glass">
+    Returns a single job record by its UUID, or `undefined` if not found.
+  </Card>
+  <Card title="create" icon="plus">
+    Inserts a new job, generating a UUID with `crypto.randomUUID()`.
+  </Card>
+  <Card title="update" icon="pen">
+    Full replacement — overwrites all fields but preserves the original `id`.
+  </Card>
+  <Card title="parcialUpdate" icon="pen-to-square">
+    Partial update — merges only the supplied fields, preserving the rest and the `id`.
+  </Card>
+  <Card title="delete" icon="trash">
+    Removes the job by index and returns the deleted record, or `null` if not found.
+  </Card>
+</CardGroup>
+
+### Method signatures
+
+```js
+// Returns { total, limit, offset, data }
+JobModel.getAll({ text, title, level, limit, technology, offset })
+
+// Returns a job object or undefined
+JobModel.getById(id)
+
+// Returns the newly created job object
+JobModel.create({ titulo, empresa, ubicacion, descripcion, data, content })
+
+// Returns the updated job object, or null if id not found
+JobModel.update(id, payload)
+
+// Returns the updated job object, or null if id not found
+JobModel.parcialUpdate(id, payload)
+
+// Returns the deleted job record, or null if id not found
+JobModel.delete(id)
+```
+
+### getAll() implementation
+
+The full `getAll` method, showing how text search, technology filtering, and pagination are applied in sequence:
+
+```js
+static async getAll({ text, title, level, limit = 10, technology, offset = 0 }) {
+  let filteredJobs = jobs;
+
+  if (text) {
+    const searchTerm = text.toLowerCase();
+    filteredJobs = filteredJobs.filter(
+      (job) =>
+        job.titulo.toLowerCase().includes(searchTerm) ||
+        job.descripcion.toLowerCase().includes(searchTerm),
+    );
+  }
+
+  if (technology) {
+    filteredJobs = filteredJobs.filter((job) =>
+      job.data.technology.includes(technology),
+    );
+  }
+
+  const limitNumber = Number(limit);
+  const offsetNumber = Number(offset);
+
+  const paginatedJobs = filteredJobs.slice(
+    offsetNumber,
+    offsetNumber + limitNumber,
+  );
+
+  return {
+    total: filteredJobs.length,
+    limit: limitNumber,
+    offset: offsetNumber,
+    data: paginatedJobs
+  }
+}
+```
+
+The `total` field in the response reflects the count **after filtering** but **before pagination**, which lets clients calculate how many pages exist.
+
+<Warning>
+  All mutations (`create`, `update`, `parcialUpdate`, `delete`) modify the in-memory array only. Because `jobs.json` is never written back to disk, all changes are lost when the server process restarts.
+</Warning>
+
+## Pagination
+
+The default pagination values come from `config.js`:
+
+| Parameter | Default | Description |
+|---|---|---|
+| `limit` | `10` | Maximum number of records to return |
+| `offset` | `0` | Number of records to skip before starting the page |
+
+Pass both as query parameters to page through results:
+
+```bash
+# Page 1: records 1–20
+GET /jobs?limit=20&offset=0
+
+# Page 2: records 21–40
+GET /jobs?limit=20&offset=20
+
+# Page 3: records 41–60
+GET /jobs?limit=20&offset=40
+```
+
+The response envelope always includes `total`, `limit`, and `offset` alongside `data`, so clients can derive the total page count without a separate request:
+
+```json
+{
+  "total": 53,
+  "limit": 20,
+  "offset": 40,
+  "data": [...]
+}
+```

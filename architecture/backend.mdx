@@ -1,0 +1,160 @@
+---
+title: "Express 5 backend architecture: routes, controllers, models"
+sidebarTitle: "Backend"
+description: "The InfoJobs DevBoard backend is an Express 5 REST API organized into routes, controllers, models, schemas, and middlewares — validated with Zod and rate-limited with express-rate-limit."
+---
+
+The InfoJobs DevBoard backend is an Express 5 REST API written with ES Modules. It follows a layered architecture where each concern lives in its own directory: routes declare URL patterns, controllers hold business logic, models handle data access, and Zod schemas validate every incoming payload. Two middleware layers — CORS and a per-route rate limiter — sit in front of the AI endpoint to control access and prevent abuse.
+
+## Directory structure
+
+```
+backend/
+├── config.js           # Global constants and environment config
+├── index.js            # Server entry point
+├── jobs.json           # Flat JSON data store
+├── routes/
+│   ├── jobs.js         # CRUD endpoints for job listings
+│   └── ai.js           # AI summary endpoint (Ollama)
+├── controllers/
+│   └── jobs.js         # Request/response logic for jobs
+├── models/
+│   └── job.js          # Data-access layer (reads/writes jobs.json)
+├── schemas/
+│   └── jobs.js         # Zod schemas: validateJob, validatePartialJob
+├── middlewares/
+│   └── cors.js         # Origin-allowlist CORS middleware factory
+└── package.json
+```
+
+## Layered architecture
+
+Every HTTP request flows through the same pipeline before a response is returned:
+
+```
+Incoming request
+       │
+       ▼
+ Middleware layer
+  (CORS, JSON body parser, rate limiter on /ai)
+       │
+       ▼
+   Router layer
+  (routes/jobs.js  ·  routes/ai.js)
+       │
+       ├── Zod validation middleware (POST / PATCH only)
+       │
+       ▼
+ Controller layer
+  (controllers/jobs.js)
+       │
+       ▼
+   Model layer
+  (models/job.js  →  jobs.json)
+       │
+       ▼
+    Response
+```
+
+## Configuration
+
+All server-wide constants and environment-driven settings are exported from `config.js`:
+
+```js
+export const DEFAULTS = {
+  LIMIT_PAGINATION: 10,
+  LIMIT_OFFSET: 0,
+  PORT: 1234
+}
+
+export const CONFIG = {
+  MODEL_AI: process.env.MODEL_AI ?? 'mistral/devstral-small-2'
+}
+```
+
+`DEFAULTS.PORT` is used by `index.js` as the fallback when `process.env.PORT` is not set. `CONFIG.MODEL_AI` can be overridden at runtime via the `MODEL_AI` environment variable — for example, to switch to a different locally available Ollama model without touching source code.
+
+## Router modules
+
+### `/jobs` — job listing CRUD
+
+Defined in `routes/jobs.js`, mounted at `/jobs` in `index.js`. Every write operation (POST and PATCH) passes through an inline Zod validation middleware before reaching the controller; invalid payloads receive a `400` response with structured error details before the controller is ever called.
+
+| Method | Path | Validation | Controller action |
+|---|---|---|---|
+| `GET` | `/jobs` | — | `JobController.getAll` |
+| `GET` | `/jobs/:id` | — | `JobController.getId` |
+| `POST` | `/jobs` | `validateJob` (full schema) | `JobController.create` |
+| `PUT` | `/jobs/:id` | — | `JobController.update` |
+| `PATCH` | `/jobs/:id` | `validatePartialJob` (partial schema) | `JobController.parcialUpdate` |
+| `DELETE` | `/jobs/:id` | — | `JobController.delete` |
+
+### `/ai` — AI job summaries
+
+Defined in `routes/ai.js`, mounted at `/ai` in `index.js`. A `express-rate-limit` instance is applied as router-level middleware, limiting each IP to **5 requests per minute** with standard `RateLimit` response headers (draft-8 spec). Requests that exceed the limit receive a `429` with a JSON error message.
+
+The single endpoint `GET /ai/summary/:id` works as follows:
+
+<Steps>
+  <Step title="Look up the job">
+    `JobModel.getById(id)` reads the matching record from `jobs.json`. Returns `404` if not found.
+  </Step>
+  <Step title="Build the prompt">
+    A multi-line Spanish-language prompt is assembled from the job's `titulo`, `empresa`, `ubicacion`, and `descripcion` fields. A system prompt restricts the model to summary-only responses.
+  </Step>
+  <Step title="Stream from Ollama">
+    `ollama.chat()` is called with `model: 'qwen2.5:3b'` and `stream: true`. Response headers are set to `Content-Type: text/plain; charset=utf-8` and `Transfer-Encoding: chunked`.
+  </Step>
+  <Step title="Forward chunks to the client">
+    Each chunk from the async iterator is written directly to the response with `res.write(content)`. The response is finalised with `res.end()` once the stream is exhausted.
+  </Step>
+  <Step title="Handle errors gracefully">
+    If an error occurs before any headers are sent, the handler sends a `500` JSON response. If headers have already been flushed (mid-stream), it calls `res.end()` to close the connection cleanly.
+  </Step>
+</Steps>
+
+## CORS middleware
+
+`middlewares/cors.js` exports a `corsMiddleware` factory that wraps the `cors` npm package with an explicit origin allowlist:
+
+```js
+import cors from 'cors';
+
+const ACCEPTED_ORIGINS = [
+  'http://localhost:5173'
+]
+
+export const corsMiddleware = ({ acceptedOrigins = ACCEPTED_ORIGINS } = {}) => {
+  return cors({
+    origin: (origin, callback) => {
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (acceptedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      console.log(origin)
+      return callback(new Error('Origen no permitido'));
+    }
+  })
+}
+```
+
+Requests with no `Origin` header (e.g. server-to-server or same-origin calls) are allowed through unconditionally. Browser requests from any origin not in `ACCEPTED_ORIGINS` are rejected with an error. In the current `index.js` the factory is commented out in favour of `cors()` with open defaults — use `corsMiddleware()` to lock down the allowed origins in production.
+
+## Running the server
+
+```bash
+# Development — restarts automatically on file changes (nodemon)
+npm run dev
+
+# Production — runs directly with Node.js
+npm start
+```
+
+The server logs `Servidor levantado en http://localhost:1234` on startup. The `PORT` environment variable overrides the default. The server also sets `app.set('trust proxy', 1)` so that the rate limiter reads the real client IP when the app is running behind a reverse proxy such as Nginx or Cloudflare.
+
+<Warning>
+  Job data is loaded from `jobs.json` into memory when the server starts. Any jobs created or modified via the API are written back to the file, but the in-process rate-limit counters (for `/ai`) are **not** persisted — they reset on every restart. There is no database: if `jobs.json` is deleted or corrupted, all job data is lost. Back up the file before deploying changes to a shared environment.
+</Warning>

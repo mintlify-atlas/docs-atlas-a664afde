@@ -1,0 +1,115 @@
+---
+title: "Setting up Ollama for local AI summaries"
+sidebarTitle: "Ollama Setup"
+description: "Install Ollama, download the qwen2.5:3b model, and start the local AI server to enable streaming job summaries in InfoJobs DevBoard."
+---
+
+Ollama is a local LLM runtime that InfoJobs DevBoard uses to generate job summaries entirely on your machine. Because everything runs locally, there are no API keys to manage, no per-request costs, and no data sent to a third-party service. The Express backend communicates with Ollama over `localhost:11434` whenever a user requests a job summary.
+
+## Installation
+
+<Steps>
+  <Step title="Download Ollama">
+    Go to [https://ollama.com](https://ollama.com) and download the installer
+    for your operating system (macOS, Linux, or Windows). Follow the
+    platform-specific installation instructions on the site.
+  </Step>
+  <Step title="Pull the model">
+    Open a terminal and download the `qwen2.5:3b` model. This is approximately
+    2 GB, so the download time will depend on your connection speed.
+
+    ```bash
+    ollama pull qwen2.5:3b
+    ```
+  </Step>
+  <Step title="Start Ollama">
+    Start the Ollama server. It will listen on `localhost:11434` by default.
+
+    ```bash
+    ollama serve
+    ```
+
+    Keep this terminal open while running InfoJobs DevBoard. The backend
+    requires the server to be reachable at that address.
+  </Step>
+  <Step title="Verify the installation">
+    In a second terminal, confirm that the model was downloaded successfully.
+    The `qwen2.5:3b` entry should appear in the output.
+
+    ```bash
+    ollama list
+    ```
+  </Step>
+</Steps>
+
+## Model options
+
+`qwen2.5:3b` is the default model used by InfoJobs DevBoard, but Ollama supports several others. The table below lists models that are compatible with the same `ollama.chat` interface used by the backend:
+
+| Model | Size | RAM Required | Quality |
+|-------|------|--------------|---------|
+| qwen2.5:3b | ~2GB | ~4GB | Good (default) |
+| llama3.2 | ~4GB | ~6GB | Excellent |
+| mistral | ~4GB | ~6GB | Good |
+| phi3 | ~2GB | ~4GB | Basic |
+
+Choose a larger model for higher-quality summaries if your machine has the available RAM, or stick with `qwen2.5:3b` or `phi3` on machines with limited resources.
+
+## Changing the model
+
+To swap the model, open `backend/routes/ai.js` and update the `model` field in the `ollama.chat` call:
+
+```js
+const response = await ollama.chat({
+  model: 'qwen2.5:3b',  // change to another model, e.g. 'llama3.2' or 'mistral'
+  messages: [{ role: 'user', content: prompt }],
+  stream: true,
+})
+```
+
+After saving the file, restart the backend. The new model must already be pulled with `ollama pull <model-name>` before the backend can use it.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Error: Ollama server not found">
+    The backend could not reach Ollama at `localhost:11434`. Make sure the
+    server is running:
+
+    ```bash
+    ollama serve
+    ```
+
+    Then verify that the model is installed:
+
+    ```bash
+    ollama list
+    ```
+
+    If `qwen2.5:3b` does not appear, pull it again with `ollama pull qwen2.5:3b`.
+  </Accordion>
+  <Accordion title="Error: Job Not Found">
+    The summary endpoint returns a 404 with `{ "error": "Job Not Found" }` when
+    the requested job ID does not exist in the database. This is expected
+    behavior — check that the job ID in the URL corresponds to a real listing.
+  </Accordion>
+  <Accordion title="CORS error in the browser">
+    If the browser blocks the request to the backend, verify that the Express
+    CORS middleware is configured and applied before the AI router. Check
+    `backend/middlewares/cors.js` and confirm it is imported in
+    `backend/index.js`.
+  </Accordion>
+  <Accordion title="Slow response or timeout">
+    Larger models take more time to produce output, especially on machines
+    without a GPU. Try switching to a lighter model:
+
+    ```bash
+    ollama pull qwen2.5:3b
+    # or
+    ollama pull phi3
+    ```
+
+    Then update the `model` field in `backend/routes/ai.js` as described in
+    the [Changing the model](#changing-the-model) section above.
+  </Accordion>
+</AccordionGroup>

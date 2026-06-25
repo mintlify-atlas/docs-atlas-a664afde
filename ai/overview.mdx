@@ -1,0 +1,67 @@
+---
+title: "AI-powered job summaries with Ollama in InfoJobs DevBoard"
+sidebarTitle: "Overview"
+description: "InfoJobs DevBoard uses a local Ollama instance with the qwen2.5:3b model to generate streaming job summaries — no external API keys, no usage costs, fully offline."
+---
+
+InfoJobs DevBoard integrates a local AI feature that lets users generate a concise summary of any job listing on demand. When a user opens a job detail page and clicks the **✨ Generar resumen con IA** button, the React frontend calls the Express backend, which proxies the request to a locally running Ollama server. Ollama streams the response back chunk by chunk so the summary appears in real time — no cloud API, no usage billing, and no internet connection required.
+
+## How it works
+
+The request travels through several layers before text appears on screen:
+
+```
+User clicks "Generate Summary"
+       ↓
+useAISummary hook → GET /ai/summary/:id
+       ↓
+Express backend → Ollama (localhost:11434)
+       ↓ (qwen2.5:3b)
+Streaming text response
+       ↓
+useAISummary updates state chunk by chunk
+       ↓
+React re-renders summary in real time
+```
+
+The `useAISummary` hook manages loading, error, and accumulated summary state. Each chunk received from the stream is appended to the previous value, so React re-renders progressively as the model generates text rather than waiting for the full response.
+
+## Key design decisions
+
+- **Local model**: No API keys, no per-request costs, works fully offline. Earlier iterations explored Vercel AI Gateway (requires a credit card), Google Gemini (free quota exhausted), and Puter.js (requires user authentication) — Ollama was chosen as the practical, cost-free alternative.
+- **Streaming**: The backend sends chunks via chunked transfer encoding as Ollama produces them, and the frontend reads each chunk with the Fetch `ReadableStream` API. This gives users immediate visual feedback instead of a long blank wait.
+- **Rate limiting**: The `/ai` router applies `express-rate-limit` at 5 requests per minute per IP to prevent abuse of the local compute resource.
+- **Model used**: `qwen2.5:3b` — approximately 2 GB on disk, requires around 4 GB of RAM. Larger or smaller models can be swapped in by changing a single line in `backend/routes/ai.js`.
+
+## Prompt template
+
+The backend constructs a user prompt from the job's stored fields and sends it to Ollama with a system prompt that constrains the model to only produce a job summary in Spanish:
+
+```
+Eres un asistente que resume ofertas de trabajo...
+Resumen en 4-6 frases la siguiente oferta de trabajo:
+Incluye: rol, empresa, ubicación y requisitos claves
+Usa un tono claro y directo en español
+Título: {titulo}
+Empresa: {empresa}
+Ubicación: {ubicacion}
+Descripción: {descripcion}
+```
+
+The system prompt explicitly instructs the model to avoid any commentary outside the summary and to respond directly in Markdown.
+
+<Note>
+  Ollama must be running at `localhost:11434` before this feature will work. If
+  it is not running, the backend will return a 500 error. See the [Ollama
+  Setup](/ai/ollama-setup) guide to get started.
+</Note>
+
+<CardGroup cols={2}>
+  <Card title="Ollama Setup" icon="server" href="/ai/ollama-setup">
+    Install Ollama, pull the qwen2.5:3b model, and start the local AI server.
+  </Card>
+  <Card title="Streaming" icon="bolt" href="/ai/streaming">
+    How the backend and frontend handle chunked transfer encoding and the Fetch
+    ReadableStream API.
+  </Card>
+</CardGroup>

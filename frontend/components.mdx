@@ -1,0 +1,203 @@
+---
+title: "React component library for InfoJobs DevBoard"
+sidebarTitle: "Components"
+description: "Reference for all shared React components in InfoJobs DevBoard, including Header, JobCard, SearchFormSection, Pagination, Spinner, and route utilities."
+---
+
+InfoJobs DevBoard's UI is built from a set of focused, reusable functional components located in `frontend/src/components/`. Each component is written as a named export (e.g. `export function Header()`), follows PascalCase naming conventions, and scopes its styles using CSS Modules where specific styling is required. Components are kept free of business logic — side-effects and data fetching are delegated to custom hooks.
+
+## Header
+
+The `Header` component renders the persistent top navigation bar that appears on every page. It contains the DevJobs logo (a clickable `Link` back to `/`), two `NavLink` items for Inicio and Empleos, a conditional Perfil link that appears only when the user is logged in, and the `HeaderUserButton` which toggles between an "Ingresar" and "Cerrar sesión" button.
+
+The header reads `isLoggedIn` from `authStore` to conditionally show the profile link, and `countFavorites()` from `favoriteStore` to display the live favourite count badge.
+
+```jsx
+import { Header } from './components/Header';
+
+// Rendered once in App.jsx, outside the <Routes> tree:
+<Header />
+```
+
+### HeaderUserButton
+
+`HeaderUserButton` is an internal sub-component of the header that handles login/logout navigation. When the user is authenticated it renders a "Cerrar sesión" button that calls `logout()` and redirects to `/`. When unauthenticated it renders an "Ingresar" button that navigates to `/login` (disabled on the `/login` page itself to prevent double-navigation).
+
+---
+
+## JobCard
+
+`JobCard` renders a single job listing inside the search results grid. It receives a `job` object from the API and displays the job title (as a `Link` to `/jobs/:id`), the company name and location, and a short description excerpt. The card's footer contains three interactive controls: a "Ver detalles" link, a `JobCardApplyButton`, and a `JobCardFavoriteButton`.
+
+Both the apply and favourite buttons are **disabled** when the user is not logged in, reading `isLoggedIn` from `authStore`.
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `job` | `object` | Job listing object from the API (`id`, `titulo`, `empresa`, `ubicacion`, `descripcion`, `data`) |
+
+```jsx
+import { JobCard } from './components/JobCard';
+
+<JobCard job={job} />
+```
+
+The card sets `data-modalidad`, `data-nivel`, and `data-technology` data attributes on the wrapping `<article>` so CSS can apply visual variants per job type.
+
+---
+
+## SearchFormSection
+
+`SearchFormSection` renders the search and filter controls at the top of the `/search` page. It contains a text search input (with a search icon) and three `<select>` dropdowns for filtering by technology, location, and experience level. A "Limpiar filtros" button appears conditionally when `hasActiveFilters` is `true`.
+
+The component delegates form logic to the `useSearchForm` hook internally; the parent page passes handler callbacks as props.
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `onSearch` | `function` | Called with a `{ technology, location, experienceLevel }` object when a dropdown changes |
+| `onTextFilter` | `function` | Called with the current text string as the user types |
+| `handleClearFilters` | `function` | Called when the "Limpiar filtros" button is clicked |
+| `filters` | `object` | Controlled values for the three select dropdowns |
+| `textToFilter` | `string` | Controlled value for the text input |
+| `hasActiveFilters` | `boolean` | When `true`, shows the clear-filters button |
+
+```jsx
+import { SearchFormSection } from './components/SearchFormSection';
+
+<SearchFormSection
+  onSearch={handleSearch}
+  onTextFilter={handleTextFilter}
+  handleClearFilters={handleClearFilters}
+  filters={filters}
+  textToFilter={textToFilter}
+  hasActiveFilters={hasActiveFilters()}
+/>
+```
+
+---
+
+## Pagination
+
+`Pagination` renders a `<nav>` element with previous/next arrow links and individual page number links. Each page link is built with `buildPageUrl`, which updates only the `page` query parameter in the current URL while preserving all other search params.
+
+The previous arrow is visually disabled (50% opacity, `pointer-events: none`) when on the first page, and the next arrow is disabled on the last page.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `currentPage` | `number` | `1` | The currently active page number |
+| `totalPages` | `number` | `10` | Total number of pages to render |
+| `onPageChange` | `function` | — | Callback invoked with the new page number |
+
+```jsx
+import { Pagination } from './components/Pagination';
+
+<Pagination
+  currentPage={currentPage}
+  totalPages={totalPages}
+  onPageChange={handlePageChange}
+/>
+```
+
+---
+
+## Spinner
+
+`Spinner` is a simple loading indicator displayed during asynchronous data fetches. It renders a CSS-animated spinner element (styled via `Spinner.module.css`) alongside a "Cargando empleos…" text label, wrapped in a `<div className="loading">`. The spinner element carries `role="status"` and `aria-label="Loading"` for accessibility.
+
+```jsx
+import { Spinner } from './components/Spinner';
+
+// Shown while job data is loading:
+{loading ? <Spinner /> : <JobListings jobs={jobs} />}
+```
+
+---
+
+## ProtectedRoute
+
+`ProtectedRoute` is a route-guard wrapper that checks `isLoggedIn` from `authStore`. If the user is not authenticated, it immediately renders a React Router `<Navigate>` to the `redirecTo` path. If the user is authenticated, it renders `children` unchanged.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `ReactNode` | — | The component tree to render when authenticated |
+| `redirecTo` | `string` | `'/login'` | Path to redirect unauthenticated users to |
+
+```jsx
+import { ProtectedRoute } from './components/ProtectedRoute';
+
+<Route
+  path="/profile"
+  element={
+    <ProtectedRoute redirecTo="/login">
+      <ProfilePage />
+    </ProtectedRoute>
+  }
+/>
+```
+
+See [Pages & Routing](/frontend/pages-and-routing) for the full routing context.
+
+---
+
+## DetailPageHeader
+
+`DetailPageHeader` renders the top section of the job detail page (`/jobs/:id`). It displays the job title, company name, and location from the `job` prop, and includes two action buttons: `DetailApplyButton` and `DetailFavoriteButton`.
+
+- **`DetailApplyButton`** — shows "Aplicar ahora" when logged in or "Iniciar sesión para aplicar" when not; disabled when unauthenticated.
+- **`DetailFavoriteButton`** — toggles the job in/out of `favoriteStore`; disabled when unauthenticated.
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `job` | `object` | The full job object from the API (`id`, `titulo`, `empresa`, `ubicacion`) |
+
+```jsx
+import { DetailPageHeader } from './components/DetailPageHeader';
+
+<DetailPageHeader job={job} />
+```
+
+---
+
+## DetailPageBreadCrumb
+
+`DetailPageBreadCrumb` renders a breadcrumb navigation trail at the top of the job detail page. It displays a "Empleos" link pointing back to `/search`, a separator `/`, and the current job title as a non-interactive `aria-current="page"` span.
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `job` | `object` | Job object; `job.titulo` is used as the current breadcrumb label |
+
+```jsx
+import { DetailPageBreadCrumb } from './components/DetailPageBreadCrumb';
+
+<DetailPageBreadCrumb job={job} />
+```
+
+---
+
+## Footer
+
+`Footer` is a minimal site-wide footer that renders a copyright notice. It is mounted once in `App.jsx` below the `<Suspense>` boundary, so it is always visible regardless of which page is active.
+
+```jsx
+import { Footer } from './components/Footer';
+
+// Rendered once in App.jsx:
+<Footer />
+```
+
+---
+
+## Link
+
+`Link` is a thin wrapper around React Router's `<Link>` component (aliased as `NavLink` from `react-router`). It normalises the prop name from React Router's `to` to `href`, making link syntax consistent with standard HTML anchor elements throughout the codebase.
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `href` | `string` | Destination path; forwarded to React Router's `to` prop |
+| `children` | `ReactNode` | Link label content |
+| `...restOfProps` | any | Any other props are spread onto the underlying `<NavLink>` |
+
+```jsx
+import { Link } from './components/Link';
+
+<Link href="/search">Ver todos los empleos</Link>
+```

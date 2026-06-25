@@ -1,0 +1,141 @@
+---
+title: "POST /jobs — create a new job listing"
+sidebarTitle: "POST /jobs"
+description: "POST /jobs creates a new job listing. Validates the request body with Zod — titulo (3–100 chars), empresa, ubicacion, and data/content objects are required."
+---
+
+The `POST /jobs` endpoint creates a new job listing and appends it to the in-memory store. The request body is validated with a Zod schema before any write occurs — if validation fails, the server returns a `400` with the individual field errors so clients can surface them directly to users.
+
+```
+POST /jobs
+```
+
+<Warning>
+  Jobs are stored in memory. All records — including newly created ones — are lost when the server restarts. This is an intentional design for the development environment; a persistent database layer is on the roadmap.
+</Warning>
+
+### Request Body Parameters
+
+<ParamField body="titulo" type="string" required>
+  Job title. Must be between **3 and 100 characters** long.
+</ParamField>
+
+<ParamField body="empresa" type="string" required>
+  Name of the company offering the position.
+</ParamField>
+
+<ParamField body="ubicacion" type="string" required>
+  Job location or remote designation (e.g. `"Remote"`, `"Madrid, Spain"`).
+</ParamField>
+
+<ParamField body="descripcion" type="string">
+  Short summary description of the role. Optional.
+</ParamField>
+
+<ParamField body="data" type="object" required>
+  Structured metadata for the job listing.
+
+  <Expandable title="data fields">
+    <ParamField body="technology" type="string[]" required>
+      Array of technology tags (e.g. `["react", "typescript"]`).
+    </ParamField>
+    <ParamField body="modalidad" type="string" required>
+      Work modality — e.g. `"remoto"`, `"presencial"`, `"híbrido"`.
+    </ParamField>
+    <ParamField body="nivel" type="string" required>
+      Experience level — e.g. `"junior"`, `"mid"`, `"senior"`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="content" type="object" required>
+  Long-form structured content for the listing page.
+
+  <Expandable title="content fields">
+    <ParamField body="description" type="string" required>
+      Full job description.
+    </ParamField>
+    <ParamField body="responsibilities" type="string" required>
+      Key responsibilities of the role.
+    </ParamField>
+    <ParamField body="requirements" type="string" required>
+      Required skills and qualifications.
+    </ParamField>
+    <ParamField body="about" type="string" required>
+      Information about the company.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Example Request
+
+```bash
+curl -X POST http://localhost:1234/jobs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "titulo": "Frontend Developer",
+    "empresa": "Acme Corp",
+    "ubicacion": "Remote",
+    "descripcion": "We are looking for a passionate frontend developer.",
+    "data": {
+      "technology": ["react", "typescript"],
+      "modalidad": "remoto",
+      "nivel": "senior"
+    },
+    "content": {
+      "description": "You will build and maintain our customer-facing React application.",
+      "responsibilities": "Develop new UI features, write unit tests, collaborate with design.",
+      "requirements": "3+ years of React experience, strong TypeScript skills.",
+      "about": "Acme Corp is a fast-growing SaaS startup based in Barcelona."
+    }
+  }'
+```
+
+### 201 Response
+
+A successful creation returns HTTP `201` with the full job object, including the server-generated UUID.
+
+```json
+{
+  "message": "Job Created",
+  "data": {
+    "id": "c3f2a1b4-9d87-4e56-b123-0f7a6c2d8e91",
+    "titulo": "Frontend Developer",
+    "empresa": "Acme Corp",
+    "ubicacion": "Remote",
+    "descripcion": "We are looking for a passionate frontend developer.",
+    "data": {
+      "technology": ["react", "typescript"],
+      "modalidad": "remoto",
+      "nivel": "senior"
+    },
+    "content": {
+      "description": "You will build and maintain our customer-facing React application.",
+      "responsibilities": "Develop new UI features, write unit tests, collaborate with design.",
+      "requirements": "3+ years of React experience, strong TypeScript skills.",
+      "about": "Acme Corp is a fast-growing SaaS startup based in Barcelona."
+    }
+  }
+}
+```
+
+### 400 Validation Error
+
+Returned when the request body fails Zod schema validation. The `details` array contains one entry per failing field.
+
+```json
+{
+  "error": "Invalid request",
+  "details": [
+    {
+      "code": "too_small",
+      "minimum": 3,
+      "type": "string",
+      "inclusive": true,
+      "exact": false,
+      "message": "El título debe tener al menos 3 caracteres",
+      "path": ["titulo"]
+    }
+  ]
+}
+```

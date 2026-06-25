@@ -1,0 +1,157 @@
+---
+title: "React 19 frontend architecture and component structure"
+sidebarTitle: "Frontend"
+description: "The InfoJobs DevBoard frontend is built with React 19, Vite 7, React Router DOM 7, and Zustand 5 — using lazy-loaded pages, protected routes, and CSS Modules."
+---
+
+The InfoJobs DevBoard frontend is a single-page application that combines React 19's concurrent rendering model with Vite 7's native ES-module dev server. Page components are lazy-loaded on demand, global state is handled by two lightweight Zustand stores, and all styling is scoped to individual components through CSS Modules. The app connects to the Express backend using the `VITE_API_URL` environment variable and streams AI-generated job summaries directly into the job detail view.
+
+## Source tree
+
+```
+frontend/
+└── src/
+    ├── components/
+    │   ├── DetailPageBreadCrumb.jsx
+    │   ├── DetailPageHeader.jsx
+    │   ├── Footer.jsx
+    │   ├── Header.jsx
+    │   ├── HeaderUserButton.jsx
+    │   ├── JobCard.jsx
+    │   ├── JobListings.jsx
+    │   ├── JobSection.jsx
+    │   ├── Link.jsx
+    │   ├── Pagination.jsx
+    │   ├── ProtectedRoute.jsx
+    │   ├── Route.jsx
+    │   ├── SearchFormSection.jsx
+    │   └── Spinner.jsx
+    ├── hooks/
+    │   ├── useAISummary.jsx
+    │   ├── useFilters.jsx
+    │   ├── useRouter.jsx
+    │   └── useSearchForm.jsx
+    ├── Pages/
+    │   ├── 404.jsx
+    │   ├── Details.jsx
+    │   ├── Home.jsx
+    │   ├── Login.jsx
+    │   ├── ProfilePage.jsx
+    │   ├── Register.jsx
+    │   └── Search.jsx
+    ├── store/
+    │   ├── authStore.js
+    │   └── favoriteStore.js
+    ├── App.jsx
+    ├── index.css
+    └── main.jsx
+```
+
+## Routing
+
+All routes are declared in `App.jsx`. Every page component is imported via `React.lazy()` so its JavaScript bundle is only downloaded when the route is first visited. A single `<Suspense>` boundary at the root of the route tree shows a loading indicator while the chunk is fetching.
+
+### Route table
+
+| Path | Component | Access |
+|---|---|---|
+| `/` | `HomePage` | Public |
+| `/search` | `SearchPage` | Public |
+| `/jobs/:id` | `JobDetails` | Public |
+| `/profile` | `ProfilePage` | **Protected** — redirects to `/login` |
+| `/login` | `Login` | Public |
+| `/register` | `Register` | Public |
+| `*` | `NotFoundPage` | Public (catch-all) |
+
+The `/profile` route is wrapped in `<ProtectedRoute redirecTo='/login'>`. If the user is not authenticated, `ProtectedRoute` redirects to `/login` instead of rendering `ProfilePage`.
+
+### App.jsx
+
+```jsx
+import { lazy, Suspense } from 'react';
+import { Routes, Route } from 'react-router';
+
+import { Header } from './components/Header';
+import { Footer } from './components/Footer';
+import { ProtectedRoute } from './components/ProtectedRoute.jsx';
+
+/**
+ * Con lazy cargamos de forma "perezoza" las paginas,
+ * es decir solo cuando las necesitamos.
+ *
+ * NOTA: para poder usarlo hay que exportar los componentes por defecto (export default)
+ */
+const HomePage = lazy(() => import('./Pages/Home.jsx'));
+const SearchPage = lazy(() => import('./Pages/Search.jsx'));
+const JobDetails = lazy(() => import('./Pages/Details.jsx'));
+const NotFoundPage = lazy(() => import('./Pages/404.jsx'));
+const ProfilePage = lazy(() => import('./Pages/ProfilePage.jsx'));
+const Login = lazy(() => import('./Pages/Login.jsx'));
+const Register = lazy(() => import('./Pages/Register.jsx'));
+
+function App() {
+  return (
+    <>
+      <Header />
+      <Suspense fallback={<div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 1rem' }}
+      >Cargando...</div>}>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/jobs/:id" element={<JobDetails />} />
+          <Route path="/profile" element={
+            <ProtectedRoute redirecTo='/login'>
+              <ProfilePage />
+            </ProtectedRoute>
+            } />+
+          <Route path='/login' element={<Login />} />
+          <Route path='/register' element={<Register />} />
+          <Route path="*" element={<NotFoundPage />} /> {/* siempre debe ir al final */}
+        </Routes>
+      </Suspense>
+      <Footer />
+    </>
+  )
+}
+
+export default App;
+```
+
+<Tip>
+  Every page component must use `export default` — this is a requirement of `React.lazy()`. Named exports will cause a runtime error when the lazy boundary tries to resolve the component.
+</Tip>
+
+## Global state (Zustand)
+
+Zustand is used in two focused stores. Neither store requires a Provider — components import the store hook directly wherever they need it.
+
+### `authStore`
+
+Manages authentication state: the current user object, login/logout actions, and the flag that `ProtectedRoute` reads to decide whether to allow access or redirect.
+
+### `favoriteStore`
+
+Manages the list of saved/favourite job IDs. Components such as `JobCard` read from and write to this store, allowing users to persist favourites across page navigations within the same session.
+
+## Custom hooks
+
+| Hook | Purpose |
+|---|---|
+| `useAISummary` | Calls `GET /ai/summary/:id` and exposes the streaming response text and loading state to `Details.jsx` |
+| `useFilters` | Derives and applies active filter state for the search and listing views |
+| `useSearchForm` | Manages the controlled search form inputs and triggers navigation to `/search` |
+| `useRouter` | Thin wrapper around React Router's `useNavigate` and `useLocation` |
+
+## Styling
+
+Each component co-locates its styles in a CSS Module file (e.g. `Header.module.css`). Class names are locally scoped by Vite's CSS Module transform, eliminating the risk of naming collisions between components. Global resets and design tokens live in `index.css`.
+
+## Backend connection
+
+The frontend never hard-codes `localhost:1234`. Instead, Vite exposes the `VITE_API_URL` environment variable at build time. Set it in a `.env` file in the `frontend/` directory:
+
+```bash
+VITE_API_URL=http://localhost:1234
+```
+
+All `fetch` calls and the `useAISummary` hook read from `import.meta.env.VITE_API_URL` to construct request URLs.

@@ -1,0 +1,79 @@
+---
+title: "InfoJobs DevBoard: AI-powered developer job board"
+sidebarTitle: "Introduction"
+description: "InfoJobs DevBoard is a full-stack job board for developers with AI-powered summaries, a RESTful Express API, and a React 19 frontend built through eight progressive stages."
+---
+
+InfoJobs DevBoard is a full-stack job board application built for developers, where users can browse and filter developer job listings, view full job details, and generate on-demand AI summaries of each posting — all powered by a local Ollama model running entirely offline. The project was developed as part of the midudev bootcamp and progresses through eight implementation stages, from a static HTML/CSS prototype up to a React 19 frontend paired with an Express 5 REST API and integrated AI.
+
+## Key features
+
+- **Job search with filters** — search listings by title, description, technology stack, and experience level (junior, senior, etc.), with paginated results.
+- **AI-powered summaries** — generate concise, streaming summaries of job postings using Ollama (`qwen2.5:3b`) running locally. No external API keys or costs required.
+- **Full CRUD REST API** — Express 5 backend exposes endpoints to list, create, update (PUT/PATCH), and delete job listings, with Zod schema validation on all inputs.
+- **React frontend with auth and routing** — React 19 app with React Router DOM 7, protected routes, user registration and login pages, and a profile page.
+- **Global state management** — Zustand 5 stores handle authentication state (`authStore`) and saved favorites (`favoriteStore`).
+- **Rate limiting** — AI endpoints are protected with `express-rate-limit` (5 requests per minute per IP) to prevent abuse.
+
+## Explore the docs
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Run the backend and frontend locally and make your first API request in minutes.
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/architecture/overview">
+    Learn how the frontend, backend, and Ollama AI layer fit together.
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/overview">
+    Browse every REST endpoint, request schema, and response shape.
+  </Card>
+  <Card title="AI Integration" icon="sparkles" href="/ai/overview">
+    Understand how streaming AI summaries are generated with Ollama.
+  </Card>
+</CardGroup>
+
+## Technology stack
+
+### Frontend
+
+| Package | Version | Role |
+|---|---|---|
+| React | 19 | UI framework |
+| Vite | 7 | Build tool and dev server |
+| React Router DOM | 7 | Client-side routing and protected routes |
+| Zustand | 5 | Global state (auth, favorites) |
+| snarkdown | 2 | Lightweight Markdown renderer for AI summaries |
+
+### Backend
+
+| Package | Version | Role |
+|---|---|---|
+| Node.js | ≥ 18 | Runtime |
+| Express | 5 | HTTP framework and routing |
+| Zod | 4 | Request body and query validation |
+| ollama | 0.6 | Local AI model client (streaming) |
+| express-rate-limit | 8 | Rate limiting for AI endpoints |
+| cors | 2 | Cross-origin resource sharing |
+
+## Implementation stages
+
+The repository is structured as a monorepo with eight numbered directories, each representing a progressive stage of the project:
+
+| Stage | Directory | Focus |
+|---|---|---|
+| 0 | `00-html-css` | Static HTML/CSS prototype |
+| 1 | `01-javascript` | Vanilla JS with local JSON data |
+| 2 | `02-react` | React 19 app with a custom router |
+| 3 | `03-router-and-zustand` | React Router DOM 7 + Zustand state management |
+| 4 | `04-express` | Express 5 REST API in JavaScript |
+| 5 | `04-node` | Node.js fundamentals (CLI, `fs`, HTTP server) |
+| 6 | `05-testing` | Playwright end-to-end testing |
+| 7 | `06-typescript` | TypeScript fundamentals |
+| 8 | `07-inteligencia-artificial` | **Main app** — React + Express + Ollama AI |
+| 9 | `08-sql` | TypeScript backend with SQLite via `better-sqlite3` |
+
+The `07-inteligencia-artificial` stage is the primary full-stack version and the one covered by the rest of this documentation.
+
+<Note>
+  InfoJobs DevBoard is a bootcamp learning exercise. Several features are planned but not yet implemented, including JWT-based authentication, persistent database storage (currently JSON files), AI response caching, and a production deployment pipeline. The frontend auth flow (registration and login) operates entirely in-memory via Zustand and does not persist across page refreshes.
+</Note>

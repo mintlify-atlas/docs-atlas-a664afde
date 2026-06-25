@@ -1,0 +1,122 @@
+---
+title: "Pages and client-side routing in InfoJobs DevBoard"
+sidebarTitle: "Pages & Routing"
+description: "InfoJobs DevBoard uses React Router DOM 7 with lazy-loaded pages, protected routes, and URL-based search filters. Covers all seven routes and the ProtectedRoute guard."
+---
+
+InfoJobs DevBoard uses **React Router DOM 7** for client-side routing. Every page component is loaded with React's `lazy()` function and wrapped in a single `<Suspense>` boundary, so the browser only downloads the code for a page when the user first navigates to it. The `Header` and `Footer` components sit outside the `<Routes>` tree so they persist across all navigations without re-mounting.
+
+## Route table
+
+| Path | Component | Protected | Description |
+|------|-----------|-----------|-------------|
+| `/` | `HomePage` | No | Landing page with hero search form |
+| `/search` | `SearchPage` | No | Paginated job listings with filter controls |
+| `/jobs/:id` | `JobDetails` | No | Full job detail view with AI summary |
+| `/profile` | `ProfilePage` | **Yes** | Authenticated user profile page |
+| `/login` | `Login` | No | Email / password login form |
+| `/register` | `Register` | No | New account registration form |
+| `*` | `NotFoundPage` | No | 404 fallback — always defined last |
+
+## Routes configuration
+
+The complete `<Routes>` block defined in `App.jsx` is shown below. Notice that all page imports are wrapped with `lazy()`, which requires each page file to use `export default`.
+
+```jsx
+import { lazy, Suspense } from 'react';
+import { Routes, Route } from 'react-router';
+
+import { Header } from './components/Header';
+import { Footer } from './components/Footer';
+import { ProtectedRoute } from './components/ProtectedRoute.jsx';
+
+const HomePage    = lazy(() => import('./Pages/Home.jsx'));
+const SearchPage  = lazy(() => import('./Pages/Search.jsx'));
+const JobDetails  = lazy(() => import('./Pages/Details.jsx'));
+const NotFoundPage = lazy(() => import('./Pages/404.jsx'));
+const ProfilePage = lazy(() => import('./Pages/ProfilePage.jsx'));
+const Login       = lazy(() => import('./Pages/Login.jsx'));
+const Register    = lazy(() => import('./Pages/Register.jsx'));
+
+function App() {
+  return (
+    <>
+      <Header />
+      <Suspense fallback={<div>Cargando...</div>}>
+        <Routes>
+          <Route path="/"         element={<HomePage />} />
+          <Route path="/search"   element={<SearchPage />} />
+          <Route path="/jobs/:id" element={<JobDetails />} />
+          <Route path="/profile"  element={
+            <ProtectedRoute redirecTo='/login'>
+              <ProfilePage />
+            </ProtectedRoute>
+          } />
+          <Route path='/login'    element={<Login />} />
+          <Route path='/register' element={<Register />} />
+          <Route path="*"         element={<NotFoundPage />} />
+        </Routes>
+      </Suspense>
+      <Footer />
+    </>
+  );
+}
+
+export default App;
+```
+
+## ProtectedRoute
+
+`ProtectedRoute` is a lightweight wrapper component that gates any route behind an authentication check. It reads the `isLoggedIn` boolean from Zustand's `authStore`. If the user is not logged in, it renders a React Router `<Navigate>` redirect to the `redirecTo` path (defaulting to `/login`) with `replace`, so the protected route is not pushed onto the browser history stack. If the user is authenticated, it renders `children` as normal.
+
+```jsx
+import { useAuthStore } from "../store/authStore";
+import { Navigate } from "react-router";
+
+export function ProtectedRoute ({ children, redirecTo = '/login' }) {
+  const { isLoggedIn } = useAuthStore();
+
+  if (!isLoggedIn) {
+    return <Navigate to={redirecTo} replace />;
+  }
+
+  return children;
+}
+```
+
+### Using ProtectedRoute
+
+Wrap any `<Route>` element with `<ProtectedRoute>` and pass the target redirect path via the `redirecTo` prop:
+
+```jsx
+<Route
+  path="/profile"
+  element={
+    <ProtectedRoute redirecTo="/login">
+      <ProfilePage />
+    </ProtectedRoute>
+  }
+/>
+```
+
+## URL-based search filters
+
+The `/search` page does not hold filter state in memory alone — filters are serialised into URL query parameters so that searches are bookmarkable and shareable. The `useFilters` hook (used inside `SearchPage`) reads the initial filter values directly from `URLSearchParams` on mount:
+
+```js
+const [filters, setFilters] = useState(() => ({
+  technology: searchParams.get('technology') || '',
+  location:   searchParams.get('type')       || '',
+  experienceLevel: searchParams.get('level') || '',
+}));
+
+const [textToFilter, setTextToFilter] = useState(
+  () => searchParams.get('text') || ''
+);
+```
+
+Every time filters change, a second `useEffect` calls `setSearchParams` to keep the URL in sync. This means the back button, browser refresh, and shared links all restore the exact same filtered view. See [Custom Hooks](/frontend/custom-hooks) for the full `useFilters` reference.
+
+<Tip>
+  Because every page component is loaded with `lazy()`, the initial JavaScript bundle contains only the code for the landing page. All other pages are fetched on demand in separate chunks, which can significantly reduce the time-to-interactive for first-time visitors.
+</Tip>

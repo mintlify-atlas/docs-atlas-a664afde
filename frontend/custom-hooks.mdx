@@ -1,0 +1,368 @@
+---
+title: "Custom React hooks in InfoJobs DevBoard"
+sidebarTitle: "Custom Hooks"
+description: "InfoJobs DevBoard defines four custom hooks — useFilters, useSearchForm, useRouter, and useAISummary — that encapsulate search, navigation, and AI summary logic."
+---
+
+InfoJobs DevBoard separates all non-trivial logic from its page and component files into custom hooks located in `frontend/src/hooks/`. This pattern keeps components declarative and easy to read, makes the logic independently testable, and allows the same behaviour to be reused across multiple components without prop drilling. Each hook follows React's naming convention of prefixing with `use`.
+
+## useAISummary
+
+`useAISummary` fetches an AI-generated summary for a given job listing from the backend's streaming endpoint. It handles the full lifecycle: initialising the stream, reading each text chunk as it arrives, and accumulating the chunks into a single `summary` string that components can render progressively.
+
+### Signature
+
+```js
+useAISummary(id: string) => {
+  summary: string | null,
+  loading: boolean,
+  error: string | null,
+  generateSummary: () => Promise<void>
+}
+```
+
+### Return values
+
+| Name | Type | Description |
+|------|------|-------------|
+| `summary` | `string \| null` | Accumulated AI text. Grows chunk-by-chunk as the stream arrives. `null` before generation starts. |
+| `loading` | `boolean` | `true` while the stream is active |
+| `error` | `string \| null` | Error message if the fetch fails; `null` otherwise |
+| `generateSummary` | `function` | Async function that initiates the fetch and begins reading the stream |
+
+### Full source
+
+```jsx
+import { useState } from "react";
+
+const API_URL = import.meta.env.VITE_API_URL;
+
+export function useAISummary(id) {
+  const [summary, setSummary]   = useState(null);
+  const [loading, setLoading]   = useState(false);
+  const [error,   setError]     = useState(null);
+
+  const generateSummary = async () => {
+    setLoading(true);
+    setError(null);
+    setSummary('');
+
+    try {
+      const response = await fetch(`${API_URL}/ai/summary/${id}`);
+
+      if (!response.ok) {
+        throw new Error('Error fetching summary');
+      }
+
+      // Stream handling via the Streams API
+      const reader  = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunkText = decoder.decode(value, { stream: true });
+        setSummary(prev => prev + chunkText);
+      }
+    } catch {
+      setError('Error al generar el resumen');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { summary, loading, error, generateSummary };
+}
+```
+
+### Usage example
+
+The `AISummary` component in `Details.jsx` shows a "Generar resumen con IA" button before the summary exists, then streams the text into the page once generation begins:
+
+```jsx
+import { useAISummary } from "../hooks/useAISummary";
+
+function AISummary({ id }) {
+  const { summary, loading, generateSummary } = useAISummary(id);
+
+  if (summary) {
+    return (
+      <section>
+        <h2>✨ Resumen generado por IA</h2>
+        <p>{summary}</p>
+      </section>
+    );
+  }
+
+  return (
+    <button onClick={generateSummary} disabled={loading}>
+      {loading ? 'Generando resumen...' : '✨ Generar resumen con IA'}
+    </button>
+  );
+}
+```
+
+---
+
+## useFilters
+
+`useFilters` is the central state-management hook for the `/search` page. It owns filter state (text query, technology, location, experience level), pagination state, and the fetched job results. On every state change it re-fetches the jobs from the API and keeps the browser URL synchronised with the current filter values via `useSearchParams`.
+
+### Signature
+
+```js
+useFilters() => {
+  jobs: object[],
+  total: number,
+  loading: boolean,
+  totalPages: number,
+  currentPage: number,
+  filters: { technology: string, location: string, experienceLevel: string },
+  textToFilter: string,
+  handlePageChange: (page: number) => void,
+  handleSearch: (filters: object) => void,
+  handleTextFilter: (text: string) => void,
+  handleClearFilters: (event: Event) => void,
+  hasActiveFilters: () => boolean
+}
+```
+
+### Return values
+
+| Name | Type | Description |
+|------|------|-------------|
+| `jobs` | `object[]` | Array of job objects returned by the current query |
+| `total` | `number` | Total number of matching jobs (used to calculate pages) |
+| `loading` | `boolean` | `true` while a fetch is in-flight |
+| `totalPages` | `number` | `Math.ceil(total / 5)` — total page count at 5 results per page |
+| `currentPage` | `number` | Currently active page number |
+| `filters` | `object` | Current values of the three dropdown filters |
+| `textToFilter` | `string` | Current free-text search string |
+| `handlePageChange` | `function` | Updates `currentPage`; triggers a new fetch |
+| `handleSearch` | `function` | Updates dropdown `filters` and resets to page 1 |
+| `handleTextFilter` | `function` | Updates `textToFilter` and resets to page 1 |
+| `handleClearFilters` | `function` | Resets all filters, text, and page to their empty/initial state |
+| `hasActiveFilters` | `function` | Returns `true` if any filter or text value is non-empty |
+
+### Key implementation details
+
+Filters are initialised from URL search params, making the current search fully restorable from a URL:
+
+```jsx
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+
+const RESULT_PER_PAGE = 5;
+
+export const useFilters = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [filters, setFilters] = useState(() => ({
+    technology:      searchParams.get('technology') || '',
+    location:        searchParams.get('type')       || '',
+    experienceLevel: searchParams.get('level')      || '',
+  }));
+
+  const [textToFilter, setTextToFilter] = useState(
+    () => searchParams.get('text') || ''
+  );
+
+  const [currentPage, setCurrentPage] = useState(() => {
+    const page = Number(searchParams.get('page'));
+    return Number.isNaN(page) ? page : 1;
+  });
+
+  // ... fetch useEffect, URL-sync useEffect, handlers
+};
+```
+
+The URL is kept in sync by a dedicated `useEffect` that calls `setSearchParams` whenever `filters`, `textToFilter`, or `currentPage` change.
+
+### Usage example
+
+```jsx
+import { useFilters } from "../hooks/useFilters";
+
+function SearchPage() {
+  const {
+    jobs, total, loading, totalPages,
+    currentPage, filters, textToFilter,
+    handlePageChange, handleSearch,
+    handleTextFilter, handleClearFilters, hasActiveFilters
+  } = useFilters();
+
+  return (
+    <main>
+      <SearchFormSection
+        onSearch={handleSearch}
+        onTextFilter={handleTextFilter}
+        handleClearFilters={handleClearFilters}
+        filters={filters}
+        textToFilter={textToFilter}
+        hasActiveFilters={hasActiveFilters()}
+      />
+      {loading ? <Spinner /> : <JobListings jobs={jobs} />}
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={handlePageChange}
+      />
+    </main>
+  );
+}
+```
+
+---
+
+## useSearchForm
+
+`useSearchForm` manages the interactive behaviour of the `SearchFormSection` form. It controls the text input's local state, debounces free-text input to avoid firing a search request on every keystroke, and builds a filters object from `FormData` when a dropdown value changes.
+
+### Signature
+
+```js
+useSearchForm(options: object) => {
+  searchText: string,
+  handleSubmit: (event: Event) => void,
+  handleTextChange: (event: Event) => void
+}
+```
+
+### Parameters
+
+The hook accepts a configuration object with the following keys:
+
+| Key | Description |
+|-----|-------------|
+| `idTechnology` | Unique ID of the technology `<select>` (from `useId()`) |
+| `idLocation` | Unique ID of the location `<select>` |
+| `idExperienceLevel` | Unique ID of the experience level `<select>` |
+| `idText` | Unique ID of the text `<input>` |
+| `onSearch` | Callback to invoke with the assembled filters object |
+| `onTextFilter` | Callback to invoke with the current text after debounce |
+| `textToFilter` | External text value used to sync the input when filters are cleared |
+
+### Key behaviour
+
+- **Dropdown changes** — `handleSubmit` fires on the form's `onChange` event. If the changed field is the text input (`event.target.name === idText`), the function returns early; otherwise it reads `FormData`, assembles the filters object, and calls `onSearch`.
+- **Text input** — `handleTextChange` updates local `searchText` immediately (for a responsive input), then sets a 500 ms debounce timeout before calling `onTextFilter`. Any previous pending timeout is cancelled first (`clearTimeout`).
+- **External clear** — a `useEffect` synchronises `searchText` with the `textToFilter` prop, so clearing all filters from the parent also clears the input visually.
+
+```jsx
+import { useEffect, useState, useRef } from "react";
+
+export const useSearchForm = ({
+  idTechnology, idLocation, idExperienceLevel,
+  idText, onSearch, onTextFilter, textToFilter
+}) => {
+  const timeoutId  = useRef(null);
+  const [searchText, setSearchText] = useState('');
+
+  // Keep input in sync when filters are cleared externally
+  useEffect(() => {
+    setSearchText(textToFilter);
+  }, [textToFilter]);
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+
+    if (event.target.name === idText) return; // handled by handleTextChange
+
+    const filters = {
+      technology:      formData.get(idTechnology),
+      location:        formData.get(idLocation),
+      experienceLevel: formData.get(idExperienceLevel),
+    };
+    onSearch(filters);
+  };
+
+  const handleTextChange = (event) => {
+    const text = event.target.value;
+    setSearchText(text);
+
+    // Debounce: wait 500 ms after user stops typing
+    if (timeoutId.current) clearTimeout(timeoutId.current);
+    timeoutId.current = setTimeout(() => {
+      onTextFilter(text);
+    }, 500);
+  };
+
+  return { searchText, handleSubmit, handleTextChange };
+};
+```
+
+---
+
+## useRouter
+
+`useRouter` is a thin abstraction over React Router's `useNavigate` and `useLocation` hooks. It centralises navigation logic and exposes a named `navigateTo` helper, making it easy to update navigation behaviour app-wide from a single location.
+
+### Signature
+
+```js
+useRouter() => {
+  currentPath: string,
+  navigateTo: (path: string) => void
+}
+```
+
+### Return values
+
+| Name | Type | Description |
+|------|------|-------------|
+| `currentPath` | `string` | The current URL pathname (e.g. `/search`) |
+| `navigateTo` | `function` | Calls React Router's `navigate(path)` programmatically |
+
+### Full source
+
+```jsx
+import { useNavigate, useLocation } from "react-router";
+
+export function useRouter() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const currentPath = location.pathname;
+
+  function navigateTo(path) {
+    navigate(path);
+  }
+
+  return {
+    currentPath,
+    navigateTo,
+  };
+}
+```
+
+### Usage example
+
+`useRouter` is used in the `HomePage` to navigate to the search page after a hero form submission, building the target URL with the `encodeURIComponent`-encoded search term:
+
+```jsx
+import { useRouter } from "../hooks/useRouter";
+
+function HomePage() {
+  const { navigateTo } = useRouter();
+
+  const handleSearch = (event) => {
+    event.preventDefault();
+    const formData   = new FormData(event.target);
+    const searchTerm = formData.get('search');
+
+    const url = searchTerm
+      ? `/search?text=${encodeURIComponent(searchTerm)}`
+      : '/search';
+
+    navigateTo(url);
+  };
+
+  return (
+    <form role="search" onSubmit={handleSearch}>
+      {/* ... */}
+    </form>
+  );
+}
+```

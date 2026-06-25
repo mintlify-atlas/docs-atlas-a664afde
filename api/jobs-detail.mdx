@@ -1,0 +1,109 @@
+---
+title: "GET /jobs/:id — retrieve a single job by ID"
+sidebarTitle: "GET /jobs/:id"
+description: "GET /jobs/:id retrieves a single job listing by its UUID. Returns the full job object or 404 if not found."
+---
+
+The `GET /jobs/:id` endpoint fetches a single job listing by its UUID. When the ID is found in the store, the complete job object is returned — including all structured `data` and `content` fields. When no match exists, the API responds with a `404` status.
+
+```
+GET /jobs/:id
+```
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The UUID of the job listing to retrieve. UUIDs are assigned automatically when a job is created and never change.
+</ParamField>
+
+### Response Fields
+
+<ResponseField name="id" type="string">
+  Unique UUID identifier for the job listing.
+</ResponseField>
+
+<ResponseField name="titulo" type="string">
+  Job title.
+</ResponseField>
+
+<ResponseField name="empresa" type="string">
+  Company offering the position.
+</ResponseField>
+
+<ResponseField name="ubicacion" type="string">
+  Job location or remote designation.
+</ResponseField>
+
+<ResponseField name="descripcion" type="string">
+  Short summary description of the role.
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Structured metadata about the job.
+
+  <Expandable title="data fields">
+    <ResponseField name="technology" type="string[]">
+      List of technology tags associated with the role (e.g. `["react", "typescript"]`).
+    </ResponseField>
+    <ResponseField name="modalidad" type="string">
+      Work modality — e.g. `remoto`, `presencial`, `híbrido`.
+    </ResponseField>
+    <ResponseField name="nivel" type="string">
+      Experience level — e.g. `junior`, `mid`, `senior`.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="content" type="object">
+  Long-form structured content for the job listing.
+
+  <Expandable title="content fields">
+    <ResponseField name="description" type="string">
+      Full job description.
+    </ResponseField>
+    <ResponseField name="responsibilities" type="string">
+      Key responsibilities for the role.
+    </ResponseField>
+    <ResponseField name="requirements" type="string">
+      Required skills and qualifications.
+    </ResponseField>
+    <ResponseField name="about" type="string">
+      Information about the company.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example
+
+```bash
+curl http://localhost:1234/jobs/7a4d1d8b-1e45-4d8c-9f1a-8c2f9a9121a4
+```
+
+```json
+{
+  "id": "7a4d1d8b-1e45-4d8c-9f1a-8c2f9a9121a4",
+  "titulo": "Desarrollador de Software Senior",
+  "empresa": "Tech Solutions Inc.",
+  "ubicacion": "Buenos Aires, Argentina",
+  "descripcion": "Buscamos un desarrollador senior con experiencia en arquitecturas modernas.",
+  "data": {
+    "technology": ["node", "typescript", "postgresql"],
+    "modalidad": "híbrido",
+    "nivel": "senior"
+  },
+  "content": {
+    "description": "Serás responsable de diseñar y mantener servicios backend escalables...",
+    "responsibilities": "Diseñar APIs REST, revisar código del equipo, colaborar con producto...",
+    "requirements": "5+ años de experiencia, dominio de TypeScript y SQL...",
+    "about": "Tech Solutions Inc. es una empresa de tecnología con más de 10 años en el mercado..."
+  }
+}
+```
+
+### 404 Response
+
+Returned when no job with the given ID exists in the store.
+
+```json
+{ "error": "job Not Found" }
+```

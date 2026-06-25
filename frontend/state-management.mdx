@@ -1,0 +1,148 @@
+---
+title: "Global state management with Zustand in InfoJobs DevBoard"
+sidebarTitle: "State Management"
+description: "InfoJobs DevBoard uses Zustand 5 for global state, with two stores: authStore for authentication and favoriteStore for tracking saved jobs."
+---
+
+InfoJobs DevBoard uses **Zustand 5** for all global client state. Zustand was chosen because it requires no `Provider` wrapper around the component tree — each store is simply a custom hook that any component can import and call directly. Stores are created with Zustand's `create` factory, which accepts a callback that receives `set` and `get` helpers for updating and reading state.
+
+<Note>
+  Neither store persists state to `localStorage` or any other storage mechanism. All state is held in memory and is lost when the page is refreshed.
+</Note>
+
+## authStore
+
+The `authStore` tracks whether the current user has authenticated. It is the single source of truth consulted by `ProtectedRoute`, `Header`, `JobCard`, and the Login / Register pages.
+
+### Source
+
+```js
+import { create } from 'zustand';
+
+export const useAuthStore = create((set) => ({
+  // State
+  isLoggedIn: false,
+
+  // Actions
+  login:  () => set({ isLoggedIn: true }),
+  logout: () => set({ isLoggedIn: false }),
+}));
+```
+
+### State and actions
+
+| Name | Type | Description |
+|------|------|-------------|
+| `isLoggedIn` | `boolean` | `true` when the user has logged in during this session |
+| `login()` | action | Sets `isLoggedIn` to `true` |
+| `logout()` | action | Sets `isLoggedIn` to `false` |
+
+### Usage in a component
+
+```jsx
+import { useAuthStore } from '../store/authStore';
+
+function MyComponent() {
+  const { isLoggedIn, login, logout } = useAuthStore();
+
+  return (
+    <div>
+      {isLoggedIn ? (
+        <button onClick={logout}>Cerrar sesión</button>
+      ) : (
+        <button onClick={login}>Iniciar sesión</button>
+      )}
+    </div>
+  );
+}
+```
+
+<Warning>
+  The current implementation is frontend-only. Both `login()` and `logout()` simply flip a boolean flag — no credentials are sent to the backend, no JWT is issued or validated, and no session cookie is set. Full backend authentication with JWT and server-side validation is a planned feature.
+</Warning>
+
+## favoriteStore
+
+The `favoriteStore` maintains the list of job IDs that the user has saved as favourites. The favourite count is displayed in the `Header` nav link, and individual `JobCard` and `DetailPageHeader` components use it to show a filled or empty heart icon.
+
+### Source
+
+```js
+import { create } from 'zustand';
+
+export const useFavoriteStore = create((set, get) => ({
+  // State
+  favorites: [],
+
+  // Actions
+  addFavorite: (id) => {
+    set((state) => ({
+      favorites: state.favorites.includes(id)
+        ? state.favorites
+        : [...state.favorites, id],
+    }));
+  },
+
+  removeFavorite: (id) => {
+    set((state) => ({
+      favorites: state.favorites.filter((favId) => favId !== id),
+    }));
+  },
+
+  isFavorite: (id) => {
+    return get().favorites.includes(id);
+  },
+
+  toggleFavorite: (id) => {
+    const { isFavorite, addFavorite, removeFavorite } = get();
+    isFavorite(id) ? removeFavorite(id) : addFavorite(id);
+  },
+
+  // Derived state
+  countFavorites: () => get().favorites.length,
+}));
+```
+
+### State and actions
+
+| Name | Type | Description |
+|------|------|-------------|
+| `favorites` | `string[]` | Array of saved job IDs |
+| `addFavorite(id)` | action | Adds `id` to `favorites` if not already present (idempotent) |
+| `removeFavorite(id)` | action | Removes `id` from `favorites` |
+| `isFavorite(id)` | selector | Returns `true` if `id` is in `favorites` |
+| `toggleFavorite(id)` | action | Calls `addFavorite` or `removeFavorite` based on current state |
+| `countFavorites()` | derived state | Returns the total number of saved job IDs |
+
+### Usage in a component
+
+```jsx
+import { useFavoriteStore } from '../store/favoriteStore';
+
+function FavoriteButton({ id }) {
+  const { isFavorite, toggleFavorite } = useFavoriteStore();
+
+  return (
+    <button
+      onClick={() => toggleFavorite(id)}
+      aria-label={isFavorite(id) ? 'Remove from favorites' : 'Add to favorites'}
+    >
+      {isFavorite(id) ? '❤️' : '🤍'}
+    </button>
+  );
+}
+```
+
+### Displaying the favourite count
+
+The `Header` component reads `countFavorites()` to show a live badge next to the profile link:
+
+```jsx
+import { useFavoriteStore } from '../store/favoriteStore';
+
+const { countFavorites } = useFavoriteStore();
+const numberOfFavorites = countFavorites();
+
+// Inside JSX:
+// Perfil ❤️ ({numberOfFavorites})
+```

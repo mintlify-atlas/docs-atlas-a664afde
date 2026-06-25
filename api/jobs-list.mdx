@@ -1,0 +1,142 @@
+---
+title: "GET /jobs — list and filter job listings"
+sidebarTitle: "GET /jobs"
+description: "GET /jobs returns a paginated list of job listings. Supports filtering by text search, technology, and level. Returns total count, limit, offset, and data array."
+---
+
+The `GET /jobs` endpoint returns a paginated collection of job listings from the in-memory store. You can narrow results with optional query parameters that filter by free-text search, technology stack, experience level, or exact title match. The response always includes metadata about the current page so clients can implement forward and backward navigation.
+
+```
+GET /jobs
+```
+
+### Query Parameters
+
+<ParamField query="text" type="string">
+  Free-text search term. Matches against both job title (`titulo`) and description (`descripcion`) using a case-insensitive substring comparison.
+</ParamField>
+
+<ParamField query="title" type="string">
+  Filter by exact title match. Compared case-insensitively against the `titulo` field.
+</ParamField>
+
+<ParamField query="level" type="string">
+  Filter by experience level. Typical values are `junior`, `mid`, and `senior`, matching the `data.nivel` field.
+</ParamField>
+
+<ParamField query="technology" type="string">
+  Filter by technology name (e.g. `react`, `node`, `typescript`). Must exactly match one of the strings in the job's `data.technology` array.
+</ParamField>
+
+<ParamField query="limit" type="number" default="10">
+  Maximum number of job records to return in a single page. Must be a positive integer.
+</ParamField>
+
+<ParamField query="offset" type="number" default="0">
+  Number of records to skip before beginning the result set. Used together with `limit` to paginate through all results.
+</ParamField>
+
+### Response Fields
+
+<ResponseField name="total" type="number">
+  Total number of jobs that matched the applied filters, regardless of `limit` and `offset`. Use this value to calculate total pages.
+</ResponseField>
+
+<ResponseField name="limit" type="number">
+  The `limit` value that was applied to this response.
+</ResponseField>
+
+<ResponseField name="offset" type="number">
+  The `offset` value that was applied to this response.
+</ResponseField>
+
+<ResponseField name="data" type="array">
+  Array of Job objects matching the query.
+
+  <Expandable title="Job object fields">
+    <ResponseField name="id" type="string">
+      Unique UUID identifier for the job listing.
+    </ResponseField>
+    <ResponseField name="titulo" type="string">
+      Job title.
+    </ResponseField>
+    <ResponseField name="empresa" type="string">
+      Company offering the position.
+    </ResponseField>
+    <ResponseField name="ubicacion" type="string">
+      Job location or remote designation.
+    </ResponseField>
+    <ResponseField name="descripcion" type="string">
+      Short summary description of the role.
+    </ResponseField>
+    <ResponseField name="data" type="object">
+      Structured metadata about the job.
+
+      <Expandable title="data fields">
+        <ResponseField name="technology" type="string[]">
+          List of technology tags associated with the role (e.g. `["react", "typescript"]`).
+        </ResponseField>
+        <ResponseField name="modalidad" type="string">
+          Work modality — e.g. `remoto`, `presencial`, `híbrido`.
+        </ResponseField>
+        <ResponseField name="nivel" type="string">
+          Experience level — e.g. `junior`, `mid`, `senior`.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="content" type="object">
+      Long-form structured content for the job listing.
+
+      <Expandable title="content fields">
+        <ResponseField name="description" type="string">
+          Full job description.
+        </ResponseField>
+        <ResponseField name="responsibilities" type="string">
+          Key responsibilities for the role.
+        </ResponseField>
+        <ResponseField name="requirements" type="string">
+          Required skills and qualifications.
+        </ResponseField>
+        <ResponseField name="about" type="string">
+          Information about the company.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example
+
+Fetch the first 5 jobs tagged with the `react` technology:
+
+```bash
+curl "http://localhost:1234/jobs?technology=react&limit=5"
+```
+
+```json
+{
+  "total": 38,
+  "limit": 5,
+  "offset": 0,
+  "data": [
+    {
+      "id": "7a4d1d8b-1e45-4d8c-9f1a-8c2f9a9121a4",
+      "titulo": "Frontend Developer Senior",
+      "empresa": "Tech Solutions Inc.",
+      "ubicacion": "Remote",
+      "descripcion": "We are looking for an experienced React developer...",
+      "data": {
+        "technology": ["react", "typescript", "node"],
+        "modalidad": "remoto",
+        "nivel": "senior"
+      },
+      "content": {
+        "description": "Full description of the role...",
+        "responsibilities": "Lead frontend architecture...",
+        "requirements": "5+ years with React...",
+        "about": "Tech Solutions Inc. is a..."
+      }
+    }
+  ]
+}
+```

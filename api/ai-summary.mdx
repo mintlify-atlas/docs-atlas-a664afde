@@ -1,0 +1,98 @@
+---
+title: "GET /ai/summary/:id — stream an AI job summary"
+sidebarTitle: "GET /ai/summary/:id"
+description: "GET /ai/summary/:id streams an AI-generated summary for a job using Ollama's qwen2.5:3b model. Rate-limited to 5 requests per minute per IP."
+---
+
+The `GET /ai/summary/:id` endpoint generates a concise, human-friendly summary of a job listing using a locally running Ollama language model. The response is streamed back to the client as plain text chunks so that the UI can progressively display content as it is produced — rather than waiting for the full generation to complete. The summary is written in Spanish, is 4–6 sentences long, and covers the role, company, location, and key requirements.
+
+```
+GET /ai/summary/:id
+```
+
+<Note>
+  Ollama must be running locally at `http://localhost:11434` for this endpoint to function. The model used is `qwen2.5:3b`. If Ollama is not running or the model is not available, the endpoint returns a `500` error (provided headers have not yet been sent).
+</Note>
+
+### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The UUID of the job listing to summarize. The job must already exist in the store.
+</ParamField>
+
+### Response Format
+
+This endpoint does **not** return JSON. The response is a raw text stream delivered with the following headers:
+
+| Header              | Value                        |
+|---------------------|------------------------------|
+| `Content-Type`      | `text/plain; charset=utf-8`  |
+| `Transfer-Encoding` | `chunked`                    |
+
+The response body is a stream of Markdown-formatted text chunks. Clients should consume the stream incrementally — each chunk is a fragment of the final summary as produced by the model.
+
+### Rate Limiting
+
+To prevent abuse of the local AI resource, this endpoint is rate-limited using `express-rate-limit` with the `draft-8` standard headers.
+
+| Setting             | Value                        |
+|---------------------|------------------------------|
+| Window              | 60 seconds                   |
+| Max requests per IP | 5                            |
+| Headers             | `RateLimit` (draft-8 spec)   |
+
+When the limit is exceeded the server responds immediately with HTTP `429`:
+
+```json
+{ "error": "Demasiadas solicitudes, por favor intenta de nuevo más tarde." }
+```
+
+### Example
+
+```bash
+curl http://localhost:1234/ai/summary/7a4d1d8b-1e45-4d8c-9f1a-8c2f9a9121a4
+```
+
+The response streams plain-text Markdown directly to stdout:
+
+```
+**Desarrollador de Software Senior en Tech Solutions Inc.**
+
+Tech Solutions Inc. busca un Desarrollador de Software Senior con sede en Buenos Aires, Argentina
+en modalidad híbrida. El rol requiere experiencia sólida en Node.js, TypeScript y PostgreSQL,
+con al menos 5 años en el desarrollo de APIs REST escalables. El candidato ideal tiene
+experiencia liderando equipos y tomando decisiones de arquitectura...
+```
+
+### Frontend Integration
+
+The React frontend consumes this endpoint via a custom `useAISummary` hook that manages the fetch lifecycle, accumulates streamed chunks, and exposes loading and error states:
+
+```jsx
+const { summary, loading, error, generateSummary } = useAISummary(jobId);
+```
+
+| Value             | Type       | Description                                              |
+|-------------------|------------|----------------------------------------------------------|
+| `summary`         | `string`   | Accumulated Markdown text received so far from the stream |
+| `loading`         | `boolean`  | `true` while the stream is in progress                   |
+| `error`           | `string \| null` | Error message if the request failed, otherwise `null` |
+| `generateSummary` | `function` | Call this to initiate the summary request                |
+
+### Error Responses
+
+<ResponseField name="404 — Job Not Found" type="object">
+  Returned when the provided job ID does not match any record in the store. Headers have not yet been sent, so the response is standard JSON.
+
+  ```json
+  { "error": "Job Not Found" }
+  ```
+</ResponseField>
+
+<ResponseField name="500 — Generation Error" type="object">
+  Returned when Ollama is unavailable or throws an error **before** any content has been streamed. If content was already streaming when the error occurs, the connection is closed silently via `res.end()`.
+
+  ```json
+  { "error": "Error generating summary" }
+  ```
+</ResponseField>

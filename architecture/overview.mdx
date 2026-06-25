@@ -1,0 +1,69 @@
+---
+title: "InfoJobs DevBoard architecture: client-server with AI"
+sidebarTitle: "Overview"
+description: "InfoJobs DevBoard uses a React frontend communicating with an Express REST API, backed by a local JSON store and an Ollama AI service for streaming job summaries."
+---
+
+InfoJobs DevBoard follows a classic client-server architecture: a React 19 single-page application running in the browser communicates exclusively with an Express 5 REST API over HTTP. The backend is the single source of truth for job data — it reads from a flat JSON file — and it also acts as a proxy between the frontend and a locally running Ollama AI service, forwarding streaming text responses back to the browser without buffering.
+
+## System diagram
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                        Browser                           │
+│                  React 19 SPA (port 5173)                │
+└───────────────────────┬──────────────────────────────────┘
+                        │  HTTP / fetch (REST + streaming)
+                        ▼
+┌──────────────────────────────────────────────────────────┐
+│              Express 5 REST API (port 1234)               │
+│  /jobs  ──► CRUD routes + Zod validation                 │
+│  /ai    ──► AI summary route + rate limiter              │
+└────────────────┬─────────────────┬───────────────────────┘
+                 │                 │
+        ┌────────▼───────┐  ┌──────▼──────────┐
+        │   jobs.json    │  │  Ollama service  │
+        │  (data store)  │  │ (localhost:11434) │
+        └────────────────┘  └─────────────────┘
+```
+
+## Two main layers
+
+**Frontend — port 5173**
+Vite 7 serves the React application in development. All user interactions — browsing jobs, searching, logging in, saving favourites — happen inside the React SPA, which fetches data from the backend via the `VITE_API_URL` environment variable (defaults to `http://localhost:1234`).
+
+**Backend — port 1234**
+The Express server handles every REST call and owns all business logic: pagination defaults, Zod-validated writes, and AI summary generation. It is started with `npm run dev` (nodemon) or `npm start` (Node.js directly).
+
+## AI layer
+
+The Ollama service runs as a separate local process on `localhost:11434`. The backend's `/ai/summary/:id` endpoint retrieves the matching job from `jobs.json`, builds a Spanish-language prompt, and calls `ollama.chat()` with `stream: true` using the `qwen2.5:3b` model. Chunks are forwarded to the client with `res.write()` as they arrive, using `Transfer-Encoding: chunked`, so the browser renders the summary progressively. A rate limiter (5 requests per IP per minute) protects this endpoint from abuse.
+
+## Technology choices
+
+| Technology | Version | Role | Why |
+|---|---|---|---|
+| React | 19.2.3 | UI layer | Concurrent features, first-class lazy loading |
+| Vite | 7.2.2 | Build / dev server | Near-instant HMR, ES-module native |
+| React Router DOM | 7.10.1 | Client-side routing | File-based and nested route support |
+| Zustand | 5.0.9 | Global state | Minimal boilerplate, no Provider wrapping |
+| Express | 5.2.1 | REST API | Async-native in v5, familiar ecosystem |
+| Zod | 4.3.6 | Schema validation | TypeScript-first, composable schemas |
+| Ollama (npm) | 0.6.3 | AI client | First-class streaming, local model support |
+| express-rate-limit | 8.2.1 | AI endpoint protection | Simple in-process rate limiting |
+| snarkdown | 2.0.0 | Markdown rendering | Tiny renderer for AI response markdown |
+
+## Explore each layer
+
+<CardGroup cols={2}>
+  <Card title="Frontend architecture" icon="browser" href="/architecture/frontend">
+    React 19, Vite 7, React Router DOM 7, Zustand 5 — lazy-loaded pages, protected routes, and CSS Modules.
+  </Card>
+  <Card title="Backend architecture" icon="server" href="/architecture/backend">
+    Express 5 REST API with routes, controllers, models, Zod schemas, and CORS middleware.
+  </Card>
+</CardGroup>
+
+<Note>
+  Job data is currently stored in a flat `jobs.json` file on the backend. There is no database — all reads and writes go through the in-memory JSON array loaded at startup. See the [Data Model](/backend/data-model) page for field definitions and the Zod schema that validates every write.
+</Note>

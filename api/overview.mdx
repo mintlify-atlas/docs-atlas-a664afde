@@ -1,0 +1,86 @@
+---
+title: "InfoJobs DevBoard REST API reference overview"
+sidebarTitle: "Overview"
+description: "The InfoJobs DevBoard REST API runs on Express 5 at localhost:1234. Covers base URL, authentication, content types, error format, and pagination."
+---
+
+The InfoJobs DevBoard REST API is an Express-based service that exposes job listing data and AI-powered summaries. It is consumed by the React frontend and can be used directly via any HTTP client. All endpoints follow REST conventions, exchange JSON bodies, and respond with consistent error shapes.
+
+### Base URL
+
+```
+http://localhost:1234
+```
+
+### Authentication
+
+The current API has **no authentication**. All endpoints are publicly accessible without any token or API key. A JWT-based authentication layer is a planned future feature and is not yet implemented.
+
+### Content Type
+
+Requests that include a body (POST, PUT, PATCH) must set the `Content-Type` header to `application/json`. All responses are returned as `application/json` unless otherwise noted — the AI summary endpoint (`GET /ai/summary/:id`) streams its response as `text/plain; charset=utf-8`.
+
+### Error Format
+
+When a request fails, the API returns a JSON object with a human-readable `error` field. Zod validation failures additionally include a `details` array containing the individual field-level errors produced by the schema parser.
+
+```json
+{
+  "error": "Human-readable error message",
+  "details": [...] 
+}
+```
+
+Common HTTP status codes returned by the API:
+
+| Code  | Meaning                              |
+|-------|--------------------------------------|
+| `200` | Success                              |
+| `201` | Resource created                     |
+| `400` | Validation error (bad request body)  |
+| `404` | Resource not found                   |
+| `429` | Rate limit exceeded                  |
+| `500` | Internal server error                |
+
+### Pagination
+
+The `GET /jobs` endpoint supports cursor-free pagination via `limit` and `offset` query parameters. If omitted, `limit` defaults to `10` and `offset` defaults to `0`. Every paginated response includes a `total` field reflecting the number of records that matched the applied filters — not the number of records in the current page.
+
+```
+GET /jobs?limit=20&offset=40
+```
+
+---
+
+## Endpoints
+
+<CardGroup cols={2}>
+  <Card
+    title="GET /jobs"
+    icon="list"
+    href="/api/jobs-list"
+  >
+    List and filter all job listings with pagination support.
+  </Card>
+  <Card
+    title="GET /jobs/:id"
+    icon="magnifying-glass"
+    href="/api/jobs-detail"
+  >
+    Retrieve a single job listing by its UUID.
+  </Card>
+  <Card
+    title="POST /jobs"
+    icon="plus"
+    href="/api/jobs-create"
+  >
+    Create a new job listing with Zod-validated input.
+  </Card>
+  <Card
+    title="GET /ai/summary/:id"
+    icon="sparkles"
+    href="/api/ai-summary"
+  >
+    Stream an AI-generated job summary via Ollama.
+  </Card>
+</CardGroup>

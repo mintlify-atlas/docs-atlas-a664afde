@@ -1,0 +1,108 @@
+{
+  "projectType": "saas",
+  "projectName": "InfoJobs DevBoard",
+  "projectDescription": "A full-stack job board platform for developers, featuring AI-powered job summaries via Ollama, a React frontend with authentication and favorites, and a RESTful Express API with filtering and pagination.",
+  "theme": "luma",
+  "primaryColor": "#4F46E5",
+  "lightColor": "#EEF2FF",
+  "darkColor": "#1E1B4B",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "project-structure"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "architecture/overview",
+              "architecture/frontend",
+              "architecture/backend"
+            ]
+          },
+          {
+            "group": "Frontend Guide",
+            "pages": [
+              "frontend/pages-and-routing",
+              "frontend/state-management",
+              "frontend/components",
+              "frontend/custom-hooks"
+            ]
+          },
+          {
+            "group": "Backend Guide",
+            "pages": [
+              "backend/configuration",
+              "backend/data-model",
+              "backend/validation"
+            ]
+          },
+          {
+            "group": "AI Integration",
+            "pages": [
+              "ai/overview",
+              "ai/ollama-setup",
+              "ai/streaming"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Jobs API",
+            "pages": [
+              "api/overview",
+              "api/jobs-list",
+              "api/jobs-detail",
+              "api/jobs-create",
+              "api/jobs-update",
+              "api/jobs-delete"
+            ]
+          },
+          {
+            "group": "AI API",
+            "pages": [
+              "api/ai-summary"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Job listing with text, technology, and level filters",
+    "Pagination of job results",
+    "AI-powered job summaries using Ollama (qwen2.5:3b) with streaming responses",
+    "Full CRUD REST API built with Express 5 and validated with Zod",
+    "React 19 frontend with React Router DOM 7 and lazy-loaded pages",
+    "Global state management with Zustand (auth + favorites)",
+    "Protected routes for authenticated pages",
+    "Rate limiting on AI endpoints (5 req/min per IP)",
+    "CORS middleware for cross-origin support",
+    "Multiple implementation stages: vanilla JS → React → TypeScript + SQLite"
+  ],
+  "publicApiSurface": [
+    "GET /jobs — list jobs with optional filters: text, title, level, technology, limit, offset",
+    "GET /jobs/:id — get a single job by UUID",
+    "POST /jobs — create a new job (Zod-validated)",
+    "PUT /jobs/:id — full update of a job",
+    "PATCH /jobs/:id — partial update of a job",
+    "DELETE /jobs/:id — delete a job",
+    "GET /ai/summary/:id — generate a streaming AI summary for a job (rate-limited 5/min)",
+    "useAISummary(id) — React hook: { summary, loading, error, generateSummary }",
+    "useAuthStore — Zustand store: { isLoggedIn, login, logout }",
+    "useFavoriteStore — Zustand store: { favorites, addFavorite, removeFavorite, isFavorite, toggleFavorite, countFavorites }",
+    "useFilters() — React hook for managing search filter state",
+    "useSearchForm() — React hook for search form handling",
+    "useRouter() — React hook wrapping React Router's navigation"
+  ]
+}

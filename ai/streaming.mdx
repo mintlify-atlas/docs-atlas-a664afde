@@ -1,0 +1,117 @@
+---
+title: "Streaming AI responses with Fetch API and Ollama"
+sidebarTitle: "Streaming"
+description: "InfoJobs DevBoard streams Ollama AI responses chunk by chunk using the Fetch ReadableStream API on the frontend and Express chunked transfer encoding on the backend."
+---
+
+InfoJobs DevBoard does not wait for the entire AI-generated summary before displaying anything. Instead, the backend uses Express's `res.write()` to forward each token to the client as soon as Ollama produces it, and the frontend uses `response.body.getReader()` to read those tokens one chunk at a time and append them to the displayed text. This pipeline means users see the first words of the summary within a second or two rather than staring at a spinner until the full response is ready.
+
+## Backend streaming
+
+The `GET /ai/summary/:id` route sets two response headers and then enters an async loop that iterates over Ollama's streaming response:
+
+```js
+res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+res.setHeader('Transfer-Encoding', 'chunked');
+
+const response = await ollama.chat({
+  model: 'qwen2.5:3b',
+  messages: [{ role: 'user', content: prompt }],
+  stream: true,
+})
+
+for await (const part of response) {
+  const content = part.message?.content;
+  if (content) {
+    res.write(content);
+  }
+}
+
+return res.end();
+```
+
+The two headers serve distinct purposes:
+
+- **`Content-Type: text/plain; charset=utf-8`** — tells the browser to treat the body as plain text encoded in UTF-8. The frontend renders it as Markdown after the stream completes, but during streaming it arrives as raw text.
+- **`Transfer-Encoding: chunked`** — instructs the HTTP layer to send the response body in a series of chunks rather than buffering it until the full content is available. Each call to `res.write()` flushes one chunk to the client immediately.
+
+Once the `for await` loop exhausts all parts from Ollama, `res.end()` signals the end of the response body.
+
+## Frontend streaming
+
+The `useAISummary` hook in `frontend/src/hooks/useAISummary.jsx` opens the stream with the native Fetch API and reads it incrementally:
+
+```jsx
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+  const chunkText = decoder.decode(value, { stream: true });
+  setSummary(prev => prev + chunkText);
+}
+```
+
+`reader.read()` returns a `{ done, value }` pair on every iteration. When `done` is `true` the stream has ended and the loop exits. Otherwise, `value` is a `Uint8Array` of raw bytes that `TextDecoder.decode()` converts to a string.
+
+The `{ stream: true }` option passed to `TextDecoder.decode()` is important: it tells the decoder to hold any incomplete multi-byte character sequence at the end of the current chunk and prepend it to the next chunk. Without this flag, multi-byte Unicode characters (such as accented Spanish letters or emoji) that happen to be split across two chunks would be decoded incorrectly and appear as replacement characters (`\uFFFD`).
+
+Each decoded string is appended to the accumulated `summary` state value with a functional update, triggering a React re-render that extends the visible text on screen.
+
+The hook exposes three pieces of state and one action:
+
+```jsx
+const { summary, loading, error, generateSummary } = useAISummary(jobId);
+```
+
+| Value | Type | Description |
+|-------|------|-------------|
+| `summary` | `string \| null` | Accumulated summary text; grows as chunks arrive |
+| `loading` | `boolean` | `true` while the stream is open |
+| `error` | `string \| null` | Set to `'Error al generar el resumen'` on failure |
+| `generateSummary` | `() => Promise<void>` | Initiates the fetch and streaming loop |
+
+## Rate limiting
+
+The AI router applies `express-rate-limit` to every route it handles, including the summary endpoint:
+
+```js
+const aiRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 5,
+  message: { error: 'Demasiadas solicitudes, por favor intenta de nuevo más tarde.' },
+  standardHeaders: 'draft-8',
+})
+```
+
+This configuration allows a maximum of **5 requests per IP address per minute**. If a client exceeds that limit, the middleware responds with HTTP 429 and the Spanish-language error message before the request ever reaches the Ollama call. The `standardHeaders: 'draft-8'` option instructs `express-rate-limit` to attach standard `RateLimit-*` response headers (as defined by the IETF draft-8 specification) so clients can inspect their remaining quota.
+
+<Warning>
+  The rate limiter state is held in memory. If the Express server restarts, all
+  counters reset. For a production deployment, configure a persistent store
+  (such as Redis) with `express-rate-limit`'s store option.
+</Warning>
+
+## Error handling
+
+If Ollama throws an error during streaming, the catch block distinguishes between two situations:
+
+```js
+if (!res.headersSent) {
+  res.setHeader('Content-Type', 'application/json');
+  return res.status(500).json({ error: 'Error generating summary' });
+}
+
+return res.end();
+```
+
+- **Headers not yet sent** — the error occurred before any chunk was written to the response. It is still possible to send a proper JSON error body with a 500 status code, which the frontend can catch and surface to the user.
+- **Headers already sent** — at least one chunk reached the client, meaning the browser has already started rendering the partial summary. Changing the status code or content type is no longer possible. The route calls `res.end()` to cleanly close the connection; the frontend's stream loop will exit naturally when it reads `done: true`.
+
+<Tip>
+  Summaries returned by Ollama are rendered as Markdown on the frontend using
+  the `snarkdown` library. This means the model's output can include bold text,
+  bullet lists, and headings that will be displayed with proper formatting in
+  the job detail view.
+</Tip>

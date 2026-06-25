@@ -1,0 +1,118 @@
+---
+title: "Configuring the InfoJobs DevBoard backend server"
+sidebarTitle: "Configuration"
+description: "Configure the InfoJobs DevBoard Express backend with environment variables for port, AI model, and CORS. Covers available npm scripts and middleware setup."
+---
+
+The InfoJobs DevBoard backend is an Express 5 server that reads its runtime settings from environment variables, falling back to sensible defaults defined in `config.js`. This keeps the codebase portable across development and production environments without requiring code changes.
+
+## Environment Variables
+
+The following variables control the server's runtime behaviour. Values in the **Default** column are used when the variable is not set.
+
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `1234` | HTTP port the Express server listens on |
+| `MODEL_AI` | `mistral/devstral-small-2` | AI model identifier — read from `CONFIG` but the active AI route uses Ollama directly with `qwen2.5:3b` |
+| `VITE_API_URL` | — | Set in the **frontend** `.env`; should point to the running backend URL (e.g. `http://localhost:1234`) |
+
+The defaults are centralised in `backend/config.js`:
+
+```js
+export const DEFAULTS = {
+  LIMIT_PAGINATION: 10,
+  LIMIT_OFFSET: 0,
+  PORT: 1234
+}
+
+export const CONFIG = {
+  MODEL_AI: process.env.MODEL_AI ?? 'mistral/devstral-small-2'
+}
+```
+
+`LIMIT_PAGINATION` and `LIMIT_OFFSET` are the fallback values used by the `JobModel` when no `limit` or `offset` query parameter is supplied.
+
+## npm Scripts
+
+Run the following commands from the `backend/` directory.
+
+| Script | Command | Description |
+|---|---|---|
+| `dev` | `nodemon index.js` | Starts the server and restarts on every file change — recommended during development |
+| `start` | `node index.js` | Starts the server without hot reload — suitable for production |
+
+```bash
+# Development (hot reload)
+npm run dev
+
+# Production
+npm start
+```
+
+## CORS
+
+CORS middleware allows the React frontend — typically served by Vite on port `5173` — to make cross-origin requests to the Express API on port `1234`.
+
+The codebase ships with a custom CORS middleware in `middlewares/cors.js` that restricts allowed origins to an explicit allow-list:
+
+```js
+import cors from 'cors';
+
+const ACCEPTED_ORIGINS = [
+  'http://localhost:5173'
+]
+
+export const corsMiddleware = ({ acceptedOrigins = ACCEPTED_ORIGINS } = {}) => {
+  return cors({
+    origin: (origin, callback) => {
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (acceptedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error('Origen no permitido'));
+    }
+  })
+}
+```
+
+The current `index.js` entry point uses the open `cors()` helper (all origins) for convenience in development. Swap in `corsMiddleware()` when you need to lock down origins:
+
+```js
+// index.js — switch between open and restricted CORS
+/* app.use(corsMiddleware()); */
+app.use(cors());
+```
+
+<Note>
+  When deploying behind a reverse proxy such as Nginx or Cloudflare, `app.set('trust proxy', 1)` is already configured in `index.js`. This ensures the rate limiter reads the real client IP from the `X-Forwarded-For` header rather than the proxy address.
+</Note>
+
+## Rate Limiting
+
+The `/ai` router applies `express-rate-limit` to prevent abuse of the Ollama-backed AI summary endpoint. The limiter is scoped exclusively to that router and does not affect the `/jobs` endpoints.
+
+```js
+const aiRateLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute window
+  limit: 5,            // max 5 requests per IP per window
+  message: { error: 'Demasiadas solicitudes, por favor intenta de nuevo más tarde.' },
+  legacyHeaders: false,
+  standardHeaders: 'draft-8',
+})
+
+aiRouter.use(aiRateLimiter);
+```
+
+When a client exceeds the limit, the server responds with HTTP `429 Too Many Requests` and the message body above. The counter resets automatically after the 60-second window.
+
+<Note>
+  The rate limit counter is stored in memory. It resets whenever the server process restarts, so it does not persist across deployments.
+</Note>
+
+<Warning>
+  The backend does not implement authentication. All endpoints — including job creation, update, and deletion — are publicly accessible without any credentials or API keys.
+</Warning>

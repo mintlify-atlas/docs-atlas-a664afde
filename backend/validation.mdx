@@ -1,0 +1,134 @@
+---
+title: "Request validation with Zod in InfoJobs DevBoard"
+sidebarTitle: "Validation"
+description: "InfoJobs DevBoard validates all job creation and update requests using Zod schemas, with separate helpers for full and partial validation."
+---
+
+Every mutating request to the `/jobs` routes passes through a Zod-based validation layer before reaching the controller. The schema is defined in `backend/schemas/jobs.js`, which exports two functions — one for full validation on `POST` and one for partial validation on `PATCH`. If validation fails, the middleware short-circuits the request and returns a structured `400` response before any business logic runs.
+
+## The jobSchema
+
+The schema mirrors the job data model, enforcing types, required fields, and length constraints on `titulo`:
+
+```js
+import * as z from 'zod';
+
+const jobSchema = z.object({
+  titulo: z
+    .string({ error: 'El título es obligatorio' })
+    .min(3, 'El título debe tener al menos 3 caracteres')
+    .max(100, 'El título no puede exceder los 100 caracteres'),
+  empresa: z.string(),
+  ubicacion: z.string(),
+  descripcion: z.string().optional(),
+  data: z.object({
+    technology: z.array(z.string()),
+    modalidad: z.string(),
+    nivel: z.string()
+  }),
+  content: z.object({
+    description: z.string(),
+    responsibilities: z.string(),
+    requirements: z.string(),
+    about: z.string()
+  })
+})
+```
+
+### Field rules at a glance
+
+| Field | Type | Required | Constraints |
+|---|---|---|---|
+| `titulo` | `string` | ✅ | Min 3 chars, max 100 chars |
+| `empresa` | `string` | ✅ | — |
+| `ubicacion` | `string` | ✅ | — |
+| `descripcion` | `string` | ❌ | Optional |
+| `data.technology` | `string[]` | ✅ | Array of technology name strings |
+| `data.modalidad` | `string` | ✅ | e.g. `"remoto"`, `"presencial"`, `"hibrido"` |
+| `data.nivel` | `string` | ✅ | e.g. `"junior"`, `"senior"` |
+| `content.description` | `string` | ✅ | Long-form job description |
+| `content.responsibilities` | `string` | ✅ | — |
+| `content.requirements` | `string` | ✅ | — |
+| `content.about` | `string` | ✅ | About the company |
+
+## Exported Validation Functions
+
+Both functions call `jobSchema.safeParse()`, which never throws — it always returns a result object with a `success` boolean.
+
+```js
+// Full validation — used for POST /jobs
+export function validateJob(input) {
+  return jobSchema.safeParse(input);
+}
+
+// Partial validation — used for PATCH /jobs/:id
+export function validatePartialJob(input) {
+  return jobSchema.partial().safeParse(input);
+}
+```
+
+`validatePartialJob` calls Zod's built-in `.partial()` method, which wraps every top-level field in `z.optional()`. This allows `PATCH` requests to supply only the fields they want to update without triggering "field required" errors.
+
+## Validation Middleware in the Route Layer
+
+`backend/routes/jobs.js` wires the validation functions into Express middleware functions that run before the controller:
+
+```js
+// Used before POST /jobs
+function validateCreate(req, res, next) {
+  const result = validateJob(req.body);
+  if (result.success) {
+    req.body = result.data;
+    return next();
+  }
+  return res.status(400).json({ error: 'Invalid request', details: result.error.errors });
+}
+
+// Used before PATCH /jobs/:id
+function validateUpdate(req, res, next) {
+  const result = validatePartialJob(req.body);
+  if (result.success) {
+    req.body = result.data;
+    return next();
+  }
+  return res.status(400).json({ error: 'Invalid request', details: result.error.errors });
+}
+
+// Middleware is applied as a second argument before the controller
+jobsRouter.post('/', validateCreate, JobController.create);
+jobsRouter.patch('/:id', validateUpdate, JobController.parcialUpdate);
+```
+
+<Tip>
+  When validation succeeds, `req.body` is replaced with `result.data` — the value produced by Zod after parsing. This means controllers always receive clean, coerced data exactly matching the schema shape, stripping any extra properties that were not declared in `jobSchema`.
+</Tip>
+
+## 400 Error Response
+
+When a request body fails validation, the middleware immediately returns HTTP `400` with a structured error payload. The `details` array contains one entry per failing field, each with the field path and the human-readable message defined in the schema:
+
+```json
+{
+  "error": "Invalid request",
+  "details": [
+    {
+      "code": "too_small",
+      "minimum": 3,
+      "type": "string",
+      "inclusive": true,
+      "exact": false,
+      "message": "El título debe tener al menos 3 caracteres",
+      "path": ["titulo"]
+    },
+    {
+      "code": "invalid_type",
+      "expected": "string",
+      "received": "undefined",
+      "path": ["empresa"],
+      "message": "Required"
+    }
+  ]
+}
+```
+
+Each object in `details` includes a `path` array identifying exactly which field failed, making it straightforward for frontend consumers to map errors back to form fields.
